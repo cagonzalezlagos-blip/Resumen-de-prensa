@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0f2d4a">
+  <meta name="description" content="Resumen de Prensa AM/PM para trabajo">
+  <title>Resumen de Prensa</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <div class="eyebrow">TRABAJO · PRENSA</div>
+      <h1>Resumen de Prensa</h1>
+    </div>
+    <button id="installBtn" class="secondary hidden">Instalar</button>
+  </header>
+
+  <main class="container">
+    <section class="card hero">
+      <div class="hero-grid">
+        <div>
+          <div class="segmented" role="group">
+            <button id="amBtn" class="seg active">AM</button>
+            <button id="pmBtn" class="seg">PM</button>
+          </div>
+          <label class="field">
+            <span>Fecha del informe</span>
+            <input id="reportDate" type="date">
+          </label>
+        </div>
+
+        <div class="period-box">
+          <span>Periodo analizado</span>
+          <strong id="periodText"></strong>
+          <small>La aplicación valida la hora de publicación de cada noticia.</small>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="searchNewsBtn" class="primary">🔎 Buscar noticias</button>
+        <button id="addNewsBtn" class="secondary">+ Agregar manualmente</button>
+        <button id="generateBtn" class="accent">Generar resumen</button>
+      </div>
+
+      <div id="searchNotice" class="notice hidden"></div>
+    </section>
+
+    <section class="stats-grid">
+      <div class="stat"><span>Encontradas</span><strong id="statTotal">0</strong></div>
+      <div class="stat"><span>Seleccionadas</span><strong id="statIncluded">0</strong></div>
+      <div class="stat"><span>Alta relevancia</span><strong id="statHigh">0</strong></div>
+      <div class="stat"><span>Fuera de rango</span><strong id="statOut">0</strong></div>
+    </section>
+
+    <section class="card">
+      <div class="section-head">
+        <div>
+          <h2>Revisión de noticias</h2>
+          <p>Confirma qué información será incluida en el informe.</p>
+        </div>
+        <div class="mini-actions">
+          <button id="selectHighBtn" class="secondary">Incluir alta relevancia</button>
+          <button id="clearCurrentBtn" class="secondary danger-outline">Limpiar</button>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <button class="tab active" data-filter="all">Todas</button>
+        <button class="tab" data-filter="national">Nacional</button>
+        <button class="tab" data-filter="regional">Regional</button>
+        <button class="tab" data-filter="police">Policial</button>
+      </div>
+
+      <div id="newsList" class="news-list"></div>
+      <div id="emptyState" class="empty">
+        <div class="empty-icon">📰</div>
+        <strong>Sin noticias para revisar</strong>
+        <p>Presiona “Buscar noticias” o agrega una noticia manualmente.</p>
+      </div>
+    </section>
+
+    <section id="outputCard" class="card hidden">
+      <div class="section-head">
+        <div>
+          <h2>Informe generado</h2>
+          <p>Listo para WhatsApp, edición final o respaldo.</p>
+        </div>
+        <div class="mini-actions">
+          <button id="copyBtn" class="primary">Copiar</button>
+          <button id="shareBtn" class="secondary">Compartir</button>
+          <button id="saveReportBtn" class="secondary">Guardar</button>
+          <button id="downloadTxtBtn" class="secondary">TXT</button>
+        </div>
+      </div>
+      <textarea id="outputText" class="output" spellcheck="false"></textarea>
+    </section>
+
+    <section class="card">
+      <div class="section-head">
+        <div>
+          <h2>Historial y respaldo</h2>
+          <p>Los datos quedan guardados localmente en este dispositivo.</p>
+        </div>
+        <div class="mini-actions">
+          <button id="exportBackupBtn" class="secondary">Respaldar</button>
+          <label class="secondary file-label">Restaurar
+            <input id="importBackupInput" type="file" accept="application/json">
+          </label>
+        </div>
+      </div>
+      <div id="historyList" class="history-list"></div>
+      <div id="historyEmpty" class="empty compact"><strong>Sin informes guardados</strong></div>
+    </section>
+
+    <section class="card source-card">
+      <h2>Fuentes y búsqueda automática</h2>
+      <p>
+        Esta versión incorpora el flujo completo y una capa de conexión para búsqueda automática.
+        Cuando se publique con un servicio de búsqueda/backend, el botón “Buscar noticias” podrá
+        importar automáticamente resultados y clasificarlos. Mientras no exista ese servicio,
+        la aplicación conserva todas las funciones de revisión y generación manual.
+      </p>
+      <details>
+        <summary>Fuentes objetivo sugeridas</summary>
+        <div class="source-grid">
+          <span>BioBioChile</span><span>SoyChile</span><span>Cooperativa</span><span>24 Horas</span>
+          <span>Meganoticias</span><span>CNN Chile</span><span>La Tercera</span><span>Emol</span>
+          <span>Poder Judicial</span><span>Fiscalía</span><span>PDI</span><span>Carabineros</span>
+          <span>SENAPRED</span><span>Delegación Presidencial</span>
+        </div>
+      </details>
+    </section>
+  </main>
+
+  <dialog id="newsDialog">
+    <form method="dialog" id="newsForm">
+      <div class="dialog-head">
+        <h3 id="dialogTitle">Agregar noticia</h3>
+        <button type="button" id="closeDialogBtn" class="icon-btn">✕</button>
+      </div>
+      <input id="newsId" type="hidden">
+      <label class="field"><span>Título</span><input id="newsTitle" required maxlength="240"></label>
+      <div class="two-col">
+        <label class="field"><span>Fuente</span><input id="newsSource" maxlength="120"></label>
+        <label class="field"><span>Fecha y hora de publicación</span><input id="newsPublished" type="datetime-local" required></label>
+      </div>
+      <label class="field"><span>Enlace</span><input id="newsUrl" type="url" placeholder="https://..."></label>
+      <label class="field"><span>Resumen</span><textarea id="newsSummary" required rows="7"></textarea></label>
+      <div class="two-col">
+        <label class="field">
+          <span>Categoría</span>
+          <select id="newsCategory">
+            <option value="national">CONTINGENCIA NACIONAL</option>
+            <option value="regional">CONTINGENCIA REGIONAL</option>
+            <option value="police">CONTINGENCIA POLICIAL</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Relevancia</span>
+          <select id="newsRelevance">
+            <option value="high">Alta</option>
+            <option value="medium" selected>Media</option>
+            <option value="low">Baja</option>
+          </select>
+        </label>
+      </div>
+      <label class="check-row"><input id="newsIncluded" type="checkbox" checked><span>Incluir en el informe</span></label>
+      <div class="dialog-actions">
+        <button type="button" id="cancelDialogBtn" class="secondary">Cancelar</button>
+        <button type="submit" class="primary">Guardar noticia</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast"></div>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
