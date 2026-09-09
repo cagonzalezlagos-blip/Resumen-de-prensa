@@ -336,4 +336,4 @@ export default async function handler(req, res) {
       detail: String(e?.message || e)
     });
   }
-      }
+    
