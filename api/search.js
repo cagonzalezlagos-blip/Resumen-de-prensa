@@ -1,4 +1,4 @@
-// Resumen de Prensa V8.1 - Vercel Serverless Function
+// Resumen de Prensa V8.2 - Vercel Serverless Function
 // Búsqueda AM/PM en fuentes abiertas, con filtros, enriquecimiento y deduplicación.
 
 const REGION_TERMS = [
@@ -272,7 +272,7 @@ async function fetchFeed(url,hint,provider) {
   const ctrl=new AbortController();
   const timer=setTimeout(()=>ctrl.abort(),6500);
   try {
-    const r=await fetch(url,{headers:{'user-agent':'Mozilla/5.0 (compatible; ResumenPrensa/8.1)','accept':'application/rss+xml,application/xml,text/xml,*/*'},signal:ctrl.signal,redirect:'follow'});
+    const r=await fetch(url,{headers:{'user-agent':'Mozilla/5.0 (compatible; ResumenPrensa/8.2)','accept':'application/rss+xml,application/xml,text/xml,*/*'},signal:ctrl.signal,redirect:'follow'});
     if (!r.ok) return [];
     return parseFeed(await r.text(),hint,provider);
   } catch { return []; }
@@ -318,17 +318,69 @@ function htmlParagraphs(html='') {
     .replace(/<style[\s\S]*?<\/style>/gi,' ')
     .replace(/<noscript[\s\S]*?<\/noscript>/gi,' ');
   const ps=[...cleaned.matchAll(/<p(?:\s[^>]*)?>([\s\S]*?)<\/p>/gi)]
-    .map(m=>clean(m[1]))
+    .map(m=>editorialClean(m[1]))
     .filter(p=>p.length>=70 && p.length<=1400)
     .filter(p=>!hasAny(p,['suscríbete','suscribete','newsletter','publicidad','síguenos','siguenos','cookies','copyright']));
   return ps.join(' ');
 }
+
+function editorialClean(text='') {
+  let s=clean(text)
+    .replace(/\bKeywords?\s*:\s*[^.]{0,500}(?:\.|$)/gi,' ')
+    .replace(/\bTags?\s*:\s*[^.]{0,500}(?:\.|$)/gi,' ')
+    .replace(/\bTemas?\s*:\s*[^.]{0,500}(?:\.|$)/gi,' ')
+    .replace(/\bLee también\b[^.]{0,500}(?:\.|$)/gi,' ')
+    .replace(/\bTambién puedes leer\b[^.]{0,500}(?:\.|$)/gi,' ')
+    .replace(/\bTe puede interesar\b[^.]{0,500}(?:\.|$)/gi,' ')
+    .replace(/\bRelacionado(?:s)?\b\s*:?\s*[^.]{0,500}(?:\.|$)/gi,' ')
+    .replace(/\bSíguenos en\b[^.]{0,300}(?:\.|$)/gi,' ')
+    .replace(/\bSuscríbete\b[^.]{0,300}(?:\.|$)/gi,' ')
+    .replace(/\bNewsletter\b[^.]{0,300}(?:\.|$)/gi,' ')
+    .replace(/\bPublicidad\b/gi,' ')
+    .replace(/\bCoach Ontológico\b[^.]{0,600}(?:\.|$)/gi,' ')
+    .replace(/\bSomos un medio regional e independiente\b[^.]{0,500}(?:\.|$)/gi,' ')
+    .replace(/\bTe resumimos las noticias\b[^.]{0,500}(?:\.|$)/gi,' ')
+    .replace(/[•●▪■◆►▶]+/g,' ')
+    .replace(/[|]{2,}/g,' ')
+    .replace(/\s+([,.;:!?])/g,'$1')
+    .replace(/([,.;:!?]){2,}/g,'$1')
+    .replace(/\s{2,}/g,' ')
+    .trim();
+
+  return s;
+}
+function editorialSentence(s='') {
+  const n=norm(s);
+  if(!s || s.length<45) return false;
+  if(hasAny(n,[
+    'keywords:','keyword:','tags:','temas:','publicidad','suscribete','suscríbete',
+    'newsletter','cookies','copyright','coach ontologico','coach ontológico',
+    'somos un medio regional','te resumimos las noticias','lee tambien','lee también',
+    'tambien puedes leer','también puedes leer','te puede interesar'
+  ])) return false;
+
+  // Evita referencias incrustadas a otra noticia con fecha/hora.
+  if(/\b(?:lunes|martes|miércoles|miercoles|jueves|viernes|sábado|sabado|domingo)\s+\d{1,2}\s+\w+\s*,?\s*\d{4}\s*\|\s*\d{1,2}:\d{2}/i.test(s)) return false;
+  return true;
+}
+function formalizeSummary(text='') {
+  let s=editorialClean(text)
+    .replace(/\s+([”"'])/g,'$1')
+    .replace(/([“"'])\s+/g,'$1')
+    .replace(/\s*-\s*-\s*/g,' - ')
+    .trim();
+
+  if(s && !/[.!?]$/.test(s)) s+='.';
+  return s;
+}
+
 function sentenceSplit(text='') {
-  return clean(text)
+  return editorialClean(text)
     .replace(/\s+/g,' ')
     .split(/(?<=[.!?])\s+(?=[A-ZÁÉÍÓÚÑ0-9¿¡“"'])/)
     .map(s=>s.trim())
-    .filter(s=>s.length>=45 && s.length<=360);
+    .filter(s=>s.length>=45 && s.length<=420)
+    .filter(editorialSentence);
 }
 function extractiveSummary(articleText='',title='',category='national') {
   const sentences=sentenceSplit(articleText);
@@ -350,53 +402,54 @@ function extractiveSummary(articleText='',title='',category='national') {
     const ns=norm(s);
     let sc=0;
 
-    // ¿Qué ocurrió? Coincidencia con el titular y vocabulario de la categoría.
-    for(const w of titleWords) if(ns.includes(w)) sc+=1.4;
-    if(hasAny(s,categoryTerms)) sc+=2.8;
+    for(const w of titleWords) if(ns.includes(w)) sc+=1.35;
+    if(hasAny(s,categoryTerms)) sc+=2.7;
 
-    // ¿Quién? Entidades e instituciones frecuentes.
-    if(/[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)+/.test(s)) sc+=1.2;
-    if(hasAny(s,['PDI','Carabineros','Fiscalía','Gobierno','Senado','Senapred','CONAF','municipalidad','alcalde','ministro','delegado presidencial'])) sc+=1.4;
+    // Quién / instituciones.
+    if(/[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)+/.test(s)) sc+=1.0;
+    if(hasAny(s,['PDI','Carabineros','Fiscalía','Gobierno','Senado','Senapred','CONAF',
+                 'municipalidad','alcalde','ministro','delegado presidencial'])) sc+=1.3;
 
-    // ¿Dónde?
-    if(hasAny(s,REGION_TERMS) || hasAny(s,['Chile','Santiago','Región de Valparaíso','region de valparaiso'])) sc+=1.4;
+    // Dónde / cuándo / resultado.
+    if(hasAny(s,REGION_TERMS) || hasAny(s,['Chile','Santiago','Región de Valparaíso','region de valparaiso'])) sc+=1.2;
+    if(/\b(hoy|ayer|esta mañana|esta tarde|esta noche|jueves|viernes|sábado|sabado|domingo|lunes|martes|miércoles|miercoles|\d{1,2}:\d{2}|\d{1,2}\s+de\s+\w+)\b/i.test(s)) sc+=0.8;
+    if(hasAny(s,['debido a','a raíz de','a raiz de','como consecuencia','producto de','tras',
+                 'luego de','mediante','resultó','resulto','dejó','dejo','detenido','detenidos',
+                 'incautó','incauto','incautó','lesionado','lesionados','fallecido','fallecidos'])) sc+=1.3;
 
-    // ¿Cuándo?
-    if(/\b(hoy|ayer|esta mañana|esta tarde|esta noche|jueves|viernes|sábado|sabado|domingo|lunes|martes|miércoles|miercoles|\d{1,2}:\d{2}|\d{1,2}\s+de\s+\w+)\b/i.test(s)) sc+=1.0;
+    if(/\b\d{1,4}\b/.test(s)) sc+=0.6;
+    if(i<5) sc+=1.3;
+    if(hasAny(s,['según','señaló','indicó','informó','confirmó','detalló','explicó'])) sc+=0.4;
 
-    // ¿Cómo / por qué / consecuencias?
-    if(hasAny(s,['debido a','a raíz de','a raiz de','por causas','como consecuencia','producto de','tras','luego de','mediante','por motivos','resultó','resulto','dejó','dejo','permitió','permitio'])) sc+=1.4;
-
-    // Datos concretos
-    if(/\b\d{1,4}\b/.test(s)) sc+=0.7;
-
-    // Favorece el inicio del artículo y frases atribuidas.
-    if(i<5) sc+=1.2;
-    if(hasAny(s,['según','señaló','indicó','informó','confirmó','detalló','explicó'])) sc+=0.5;
-
-    if(hasAny(s,['publicidad','suscríbete','suscribete','newsletter','cookies'])) sc-=10;
     return {s,i,sc};
   }).sort((a,b)=>b.sc-a.sc);
 
   const chosen=[];
   for(const x of scored){
-    if(chosen.some(y=>similarity(y.s,x.s)>0.72)) continue;
+    if(chosen.some(y=>similarity(y.s,x.s)>0.70)) continue;
     chosen.push(x);
-    if(chosen.length>=3) break;
+    if(chosen.length>=4) break;
   }
 
+  // Mantiene el orden narrativo original para que el resumen se lea naturalmente.
   chosen.sort((a,b)=>a.i-b.i);
-  let out=chosen.map(x=>x.s).join(' ');
 
-  // Evita resúmenes demasiado breves o que repitan solo el titular.
-  if(out.length<140 || similarity(out,title)>0.72) return '';
+  let selected=chosen.map(x=>x.s).filter(editorialSentence);
+  if(!selected.length) return '';
 
-  if(out.length>760){
-    out=out.slice(0,760);
-    const cut=out.lastIndexOf('. ');
-    if(cut>420) out=out.slice(0,cut+1);
+  // 2 a 4 oraciones; máximo aproximado de 900 caracteres.
+  let out='';
+  for(const s of selected){
+    const candidate=(out ? out+' ' : '')+s;
+    if(candidate.length>900 && out.length>=300) break;
+    out=candidate;
   }
-  return clean(out);
+
+  out=formalizeSummary(out);
+
+  // No acepta como resumen una simple repetición del titular.
+  if(out.length<150 || similarity(out,title)>0.76) return '';
+  return out;
 }
 
 function compactDisplayUrl(url='') {
@@ -447,7 +500,7 @@ async function resolveDirectByTitle(item) {
   const timer=setTimeout(()=>ctrl.abort(),5000);
   try{
     const r=await fetch(url,{
-      headers:{'user-agent':'Mozilla/5.0 (compatible; ResumenPrensa/8.1)'},
+      headers:{'user-agent':'Mozilla/5.0 (compatible; ResumenPrensa/8.2)'},
       signal:ctrl.signal,redirect:'follow'
     });
     if(!r.ok) return '';
@@ -484,7 +537,7 @@ async function enrichItem(item) {
   try {
     const r=await fetch(workingUrl,{
       headers:{
-        'user-agent':'Mozilla/5.0 (compatible; ResumenPrensa/8.1)',
+        'user-agent':'Mozilla/5.0 (compatible; ResumenPrensa/8.2)',
         'accept':'text/html,application/xhtml+xml'
       },
       signal:ctrl.signal,
@@ -517,7 +570,7 @@ async function enrichItem(item) {
 
     const metaSummary=usableSummary(candidateTitle,ogDesc,source);
     const feedSummary=usableSummary(candidateTitle,item.summary,source);
-    const summary=articleSummary || metaSummary || feedSummary || '';
+    const summary=formalizeSummary(articleSummary || metaSummary || feedSummary || '');
 
     return {
       ...item,
@@ -584,19 +637,36 @@ function keyWords(title='') {
 function sameEvent(a,b) {
   const na=norm(a.title), nb=norm(b.title);
 
+  // Paso fronterizo: un solo hecho operacional por cierre/apertura.
   if (a.category==='paso' && b.category==='paso') {
-    const closeA=/(cierre|cerrar|cerrado|cierran)/.test(na);
-    const closeB=/(cierre|cerrar|cerrado|cierran)/.test(nb);
-    if (closeA && closeB) return true;
+    const closeA=/(cierre|cerrar|cerrado|cierran|suspende)/.test(na);
+    const closeB=/(cierre|cerrar|cerrado|cierran|suspende)/.test(nb);
+    const openA=/(abre|abierto|habilitado|reabre)/.test(na);
+    const openB=/(abre|abierto|habilitado|reabre)/.test(nb);
+    if ((closeA&&closeB)||(openA&&openB)) return true;
   }
 
+  // Casos conocidos con entidades coincidentes.
   if (hasAny(na,['longton']) && hasAny(nb,['longton']) && hasAny(na,['squella']) && hasAny(nb,['squella'])) return true;
 
   const A=new Set(keyWords(a.title)), B=new Set(keyWords(b.title));
   if (!A.size || !B.size) return false;
-  let inter=0; for (const w of A) if (B.has(w)) inter++;
-  const ratio=inter/Math.min(A.size,B.size);
-  return (inter>=4 && ratio>=0.42) || ratio>=0.62;
+
+  let inter=0;
+  for (const w of A) if (B.has(w)) inter++;
+  const minRatio=inter/Math.min(A.size,B.size);
+  const union=new Set([...A,...B]).size;
+  const jaccard=union ? inter/union : 0;
+
+  // Refuerzo para cifras + tema coincidente: evita dos notas del mismo balance de homicidios.
+  const numsA=(na.match(/\d+(?:[.,]\d+)?/g)||[]);
+  const numsB=(nb.match(/\d+(?:[.,]\d+)?/g)||[]);
+  const sameNumber=numsA.some(n=>numsB.includes(n));
+  const sameCore=hasAny(na,['homicidio','homicidios','crimen organizado']) &&
+                 hasAny(nb,['homicidio','homicidios','crimen organizado']);
+  if(sameNumber && sameCore && inter>=2) return true;
+
+  return (inter>=4 && minRatio>=0.40) || minRatio>=0.58 || jaccard>=0.48;
 }
 function quality(item) {
   let q=0;
@@ -607,6 +677,10 @@ function quality(item) {
   if (item.provider==='Bing News') q+=1;
   if (item.title && item.title.length>=45 && item.title.length<=220) q+=2;
   q+=sourceQuality(item.source,item.url);
+
+  const content=`${item.title||''} ${item.summary||''}`;
+  if(hasAny(content,['keywords:','coach ontológico','coach ontologico','somos un medio regional','newsletter','publicidad'])) q-=20;
+  if(item.summary && item.summary.length>=180 && item.summary.length<=950) q+=2;
   return q;
 }
 function dedupe(items) {
@@ -704,7 +778,9 @@ module.exports=async function handler(req,res) {
     const quotas={national:4,regional:4,police:5,autopistas:2,paso:1};
     const used={national:0,regional:0,police:0,autopistas:0,paso:0};
     news=news.map(x=>{
-      const eligible=x.titleVerified && x.relevance!=='low' && x.scoreValue>=7 && !!x.reportUrl && (!!x.summaryFromArticle || (x.summaryVerified && x.summary && x.summary.length>=140));
+      const truncatedTitle=/[:;,\-–—]\s*(?:de|del|la|el|un|una|y|o)?\s*$/i.test((x.title||'').trim()) || (x.title||'').length<28;
+      const dirtySummary=hasAny(x.summary||'',['keywords:','coach ontológico','coach ontologico','somos un medio regional','newsletter','publicidad']);
+      const eligible=x.titleVerified && !truncatedTitle && !dirtySummary && x.relevance!=='low' && x.scoreValue>=7 && !!x.reportUrl && (!!x.summaryFromArticle || (x.summaryVerified && x.summary && x.summary.length>=150));
       if (eligible && used[x.category] < (quotas[x.category]||0)) {
         x.included=true;
         used[x.category]++;
@@ -717,7 +793,7 @@ module.exports=async function handler(req,res) {
     res.setHeader('Pragma','no-cache');
     res.setHeader('Expires','0');
     return res.status(200).json({
-      news,count:news.length,start:start.toISOString(),end:end.toISOString(),version:'8.1',
+      news,count:news.length,start:start.toISOString(),end:end.toISOString(),version:'8.2',
       diagnostics:{feedsConsulted:jobs.length,raw:batches.flat().length,inPeriod:parsed.length,enriched:enriched.length,final:news.length}
     });
   } catch(e) {
