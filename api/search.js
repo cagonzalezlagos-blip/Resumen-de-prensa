@@ -1,4 +1,4 @@
-// Resumen de Prensa V7.1 - Vercel Serverless Function
+// Resumen de Prensa V8 - Vercel Serverless Function
 // Búsqueda AM/PM en fuentes abiertas, con filtros, enriquecimiento y deduplicación.
 
 const REGION_TERMS = [
@@ -184,11 +184,18 @@ function usableSummary(title,raw,source='') {
 function strongPolice(text) {
   return hasAny(text,POLICE_STRONG_TERMS) || (hasAny(text,POLICE_WEAK_TERMS) && hasAny(text,['detenido','carabineros','pdi','fiscalía','fiscalia','brigada']));
 }
+
+function policeOperationalContext(text='') {
+  return strongPolice(text) || hasAny(text,[
+    'fiscalización','fiscalizacion','control carretero','operativo','procedimiento policial',
+    'detenido','detenidos','incautación','incautacion','allanamiento'
+  ]);
+}
 function classify(text,hint='national',source='') {
   if (hasAny(text,PASO_TERMS) && hasAny(text,PASO_OPERATION_TERMS)) return 'paso';
   if (hasAny(text,AUTOPISTA_TERMS) && hasAny(text,ROAD_OPERATION_TERMS)) return 'autopistas';
   const regional=regionalContext(text,source);
-  const police=strongPolice(text);
+  const police=policeOperationalContext(text);
   if (regional && police) return 'police';
   if (regional) return 'regional';
   return 'national';
@@ -200,7 +207,12 @@ function relevant(text,category,source='') {
     const chile=hasAny(text,CHILE_CONTEXT);
     if (!chile) return false;
     if (foreign && !hasAny(text,['paso los libertadores','cristo redentor','frontera chile argentina'])) return false;
-    return hasAny(text,NATIONAL_RELEVANCE) || strongPolice(text);
+    return hasAny(text,[
+      'seguridad pública','seguridad publica','crimen organizado','terrorismo','atentado','inteligencia',
+      'orden público','orden publico','fuerzas armadas','estado de excepción','estado de excepcion',
+      'frontera','homicidio','homicidios','secuestro','pdi','carabineros','fiscalía','fiscalia',
+      'senapred','alerta roja','incendio forestal','terremoto','tsunami'
+    ]) || strongPolice(text);
   }
   if (category==='regional') return hasAny(text,REGION_TERMS) && (hasAny(text,REGIONAL_RELEVANCE) || hasAny(text,POLICE_WEAK_TERMS));
   if (category==='police') return hasAny(text,REGION_TERMS) && strongPolice(text);
@@ -252,7 +264,7 @@ async function fetchFeed(url,hint,provider) {
   const ctrl=new AbortController();
   const timer=setTimeout(()=>ctrl.abort(),6500);
   try {
-    const r=await fetch(url,{headers:{'user-agent':'Mozilla/5.0 (compatible; ResumenPrensa/7.1)','accept':'application/rss+xml,application/xml,text/xml,*/*'},signal:ctrl.signal,redirect:'follow'});
+    const r=await fetch(url,{headers:{'user-agent':'Mozilla/5.0 (compatible; ResumenPrensa/8.0)','accept':'application/rss+xml,application/xml,text/xml,*/*'},signal:ctrl.signal,redirect:'follow'});
     if (!r.ok) return [];
     return parseFeed(await r.text(),hint,provider);
   } catch { return []; }
@@ -313,7 +325,11 @@ function sentenceSplit(text='') {
 function extractiveSummary(articleText='',title='',category='national') {
   const sentences=sentenceSplit(articleText);
   if(!sentences.length) return '';
-  const titleWords=new Set(norm(title).replace(/[^a-z0-9ñ ]/g,' ').split(' ').filter(w=>w.length>4));
+
+  const titleWords=new Set(
+    norm(title).replace(/[^a-z0-9ñ ]/g,' ').split(' ').filter(w=>w.length>4)
+  );
+
   const categoryTerms={
     national:NATIONAL_RELEVANCE,
     regional:REGIONAL_RELEVANCE,
@@ -321,15 +337,36 @@ function extractiveSummary(articleText='',title='',category='national') {
     autopistas:[...AUTOPISTA_TERMS,...ROAD_OPERATION_TERMS],
     paso:[...PASO_TERMS,...PASO_OPERATION_TERMS]
   }[category]||[];
+
   const scored=sentences.map((s,i)=>{
-    let sc=0;
     const ns=norm(s);
-    for(const w of titleWords) if(ns.includes(w)) sc+=1.2;
-    if(hasAny(s,categoryTerms)) sc+=2.5;
-    if(/\b\d{1,4}\b/.test(s)) sc+=0.5;
-    if(i<4) sc+=1.3;
-    if(hasAny(s,['según','señaló','indicó','informó','confirmó','detalló','explicó'])) sc+=0.6;
-    if(hasAny(s,['publicidad','suscríbete','newsletter'])) sc-=8;
+    let sc=0;
+
+    // ¿Qué ocurrió? Coincidencia con el titular y vocabulario de la categoría.
+    for(const w of titleWords) if(ns.includes(w)) sc+=1.4;
+    if(hasAny(s,categoryTerms)) sc+=2.8;
+
+    // ¿Quién? Entidades e instituciones frecuentes.
+    if(/[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)+/.test(s)) sc+=1.2;
+    if(hasAny(s,['PDI','Carabineros','Fiscalía','Gobierno','Senado','Senapred','CONAF','municipalidad','alcalde','ministro','delegado presidencial'])) sc+=1.4;
+
+    // ¿Dónde?
+    if(hasAny(s,REGION_TERMS) || hasAny(s,['Chile','Santiago','Región de Valparaíso','region de valparaiso'])) sc+=1.4;
+
+    // ¿Cuándo?
+    if(/\b(hoy|ayer|esta mañana|esta tarde|esta noche|jueves|viernes|sábado|sabado|domingo|lunes|martes|miércoles|miercoles|\d{1,2}:\d{2}|\d{1,2}\s+de\s+\w+)\b/i.test(s)) sc+=1.0;
+
+    // ¿Cómo / por qué / consecuencias?
+    if(hasAny(s,['debido a','a raíz de','a raiz de','por causas','como consecuencia','producto de','tras','luego de','mediante','por motivos','resultó','resulto','dejó','dejo','permitió','permitio'])) sc+=1.4;
+
+    // Datos concretos
+    if(/\b\d{1,4}\b/.test(s)) sc+=0.7;
+
+    // Favorece el inicio del artículo y frases atribuidas.
+    if(i<5) sc+=1.2;
+    if(hasAny(s,['según','señaló','indicó','informó','confirmó','detalló','explicó'])) sc+=0.5;
+
+    if(hasAny(s,['publicidad','suscríbete','suscribete','newsletter','cookies'])) sc-=10;
     return {s,i,sc};
   }).sort((a,b)=>b.sc-a.sc);
 
@@ -339,14 +376,31 @@ function extractiveSummary(articleText='',title='',category='national') {
     chosen.push(x);
     if(chosen.length>=3) break;
   }
+
   chosen.sort((a,b)=>a.i-b.i);
   let out=chosen.map(x=>x.s).join(' ');
-  if(out.length>780){
-    out=out.slice(0,780);
+
+  // Evita resúmenes demasiado breves o que repitan solo el titular.
+  if(out.length<140 || similarity(out,title)>0.72) return '';
+
+  if(out.length>760){
+    out=out.slice(0,760);
     const cut=out.lastIndexOf('. ');
     if(cut>420) out=out.slice(0,cut+1);
   }
   return clean(out);
+}
+
+function compactDisplayUrl(url='') {
+  try {
+    const u=new URL(url);
+    let path=u.pathname.replace(/\/+$/,'');
+    if(path.length>72){
+      const parts=path.split('/').filter(Boolean);
+      path='/'+parts.slice(-2).join('/');
+    }
+    return `${u.hostname.replace(/^www\./,'')}${path}`;
+  } catch { return ''; }
 }
 function reportSourceName(source='',url='') {
   if(hasAny(source,['biobio']) || /biobiochile\.cl/i.test(url)) return 'BioBioChile';
@@ -373,7 +427,7 @@ async function enrichItem(item) {
   try {
     const r=await fetch(item.url,{
       headers:{
-        'user-agent':'Mozilla/5.0 (compatible; ResumenPrensa/7.1)',
+        'user-agent':'Mozilla/5.0 (compatible; ResumenPrensa/8.0)',
         'accept':'text/html,application/xhtml+xml'
       },
       signal:ctrl.signal,
@@ -413,6 +467,7 @@ async function enrichItem(item) {
       title:candidateTitle||item.title,
       summary,
       summaryFromArticle:!!articleSummary,
+      summaryMethod:articleSummary?'article-body':(metaSummary?'meta-description':(feedSummary?'rss':'none')),
       url:direct?canonical:stripTracking(item.url),
       reportUrl:direct?canonical:'',
       source:reportSourceName(source,canonical),
@@ -491,7 +546,7 @@ function quality(item) {
   if (item.summaryFromArticle) q+=10;
   else if (item.summary) q+=4;
   if (item.direct||isDirectSourceUrl(item.url)) q+=4;
-  if (hasAny(item.source,['BioBioChile','biobio'])) q+=10;
+  if (hasAny(item.source,['BioBioChile','biobio'])) q+=16;
   if (item.provider==='Bing News') q+=1;
   if (item.title && item.title.length>=45 && item.title.length<=220) q+=2;
   q+=sourceQuality(item.source,item.url);
@@ -562,12 +617,13 @@ module.exports=async function handler(req,res) {
       const sc=score(text,category,x.hint,!!x.summary,direct);
       const title=stripSourceSuffix(x.title,x.source).trim();
       const badTitle=suspiciousTitle(title);
-      const summary=x.summary||titleSummary(title,category);
+      const summary=x.summary||'';
       return {
         title,
         summary,
         url:x.url,
         reportUrl:x.reportUrl||'',
+        displayUrl:compactDisplayUrl(x.reportUrl||x.url||''),
         source:x.source,
         published:x.published,
         category,
@@ -591,7 +647,7 @@ module.exports=async function handler(req,res) {
     const quotas={national:4,regional:4,police:5,autopistas:2,paso:1};
     const used={national:0,regional:0,police:0,autopistas:0,paso:0};
     news=news.map(x=>{
-      const eligible=x.titleVerified && x.relevance!=='low' && x.scoreValue>=7 && (!!x.summaryFromArticle || !!x.summaryVerified || hasAny(x.source,['BioBioChile','biobio']));
+      const eligible=x.titleVerified && x.relevance!=='low' && x.scoreValue>=7 && !!x.summaryFromArticle && !!x.reportUrl;
       if (eligible && used[x.category] < (quotas[x.category]||0)) {
         x.included=true;
         used[x.category]++;
@@ -604,7 +660,7 @@ module.exports=async function handler(req,res) {
     res.setHeader('Pragma','no-cache');
     res.setHeader('Expires','0');
     return res.status(200).json({
-      news,count:news.length,start:start.toISOString(),end:end.toISOString(),version:'7.1',
+      news,count:news.length,start:start.toISOString(),end:end.toISOString(),version:'8.0',
       diagnostics:{feedsConsulted:jobs.length,raw:batches.flat().length,inPeriod:parsed.length,enriched:enriched.length,final:news.length}
     });
   } catch(e) {
