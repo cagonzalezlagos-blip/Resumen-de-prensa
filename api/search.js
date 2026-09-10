@@ -1,4 +1,4 @@
-// Resumen de Prensa V8 - Vercel Serverless Function
+// Resumen de Prensa V8.1 - Vercel Serverless Function
 // Búsqueda AM/PM en fuentes abiertas, con filtros, enriquecimiento y deduplicación.
 
 const REGION_TERMS = [
@@ -185,6 +185,13 @@ function strongPolice(text) {
   return hasAny(text,POLICE_STRONG_TERMS) || (hasAny(text,POLICE_WEAK_TERMS) && hasAny(text,['detenido','carabineros','pdi','fiscalía','fiscalia','brigada']));
 }
 
+
+function ordinaryTrafficAccident(text='') {
+  const n=norm(text);
+  const accident=hasAny(n,['colisión','colision','choque','volcamiento','accidente de tránsito','accidente de transito','microbús','microbus']);
+  const crime=hasAny(n,['detenido','detenidos','asalto','balacera','homicidio','secuestro','arma de fuego','drogas','narcotráfico','narcotrafico','fiscalía','fiscalia','pdi']);
+  return accident && !crime;
+}
 function policeOperationalContext(text='') {
   return strongPolice(text) || hasAny(text,[
     'fiscalización','fiscalizacion','control carretero','operativo','procedimiento policial',
@@ -195,6 +202,7 @@ function classify(text,hint='national',source='') {
   if (hasAny(text,PASO_TERMS) && hasAny(text,PASO_OPERATION_TERMS)) return 'paso';
   if (hasAny(text,AUTOPISTA_TERMS) && hasAny(text,ROAD_OPERATION_TERMS)) return 'autopistas';
   const regional=regionalContext(text,source);
+  if (regional && ordinaryTrafficAccident(text)) return 'regional';
   const police=policeOperationalContext(text);
   if (regional && police) return 'police';
   if (regional) return 'regional';
@@ -264,7 +272,7 @@ async function fetchFeed(url,hint,provider) {
   const ctrl=new AbortController();
   const timer=setTimeout(()=>ctrl.abort(),6500);
   try {
-    const r=await fetch(url,{headers:{'user-agent':'Mozilla/5.0 (compatible; ResumenPrensa/8.0)','accept':'application/rss+xml,application/xml,text/xml,*/*'},signal:ctrl.signal,redirect:'follow'});
+    const r=await fetch(url,{headers:{'user-agent':'Mozilla/5.0 (compatible; ResumenPrensa/8.1)','accept':'application/rss+xml,application/xml,text/xml,*/*'},signal:ctrl.signal,redirect:'follow'});
     if (!r.ok) return [];
     return parseFeed(await r.text(),hint,provider);
   } catch { return []; }
@@ -420,14 +428,63 @@ function canonicalLink(html) {
 function isDirectSourceUrl(url='') {
   try { return !/news\.google\.com|bing\.com\/news/i.test(new URL(url).hostname+new URL(url).pathname); } catch { return false; }
 }
+
+async function resolveDirectByTitle(item) {
+  const title=clean(item.title||'');
+  if(!title) return '';
+  let domainHint='';
+  const s=norm(item.source||'');
+  if(s.includes('biobio')) domainHint=' site:biobiochile.cl';
+  else if(s.includes('cnn chile')) domainHint=' site:cnnchile.com';
+  else if(s.includes('cooperativa')) domainHint=' site:cooperativa.cl';
+  else if(s.includes('puranoticia')) domainHint=' site:puranoticia.cl OR site:puranoticia.pnt.cl';
+  else if(s.includes('soy chile')) domainHint=' site:soychile.cl';
+  else if(s.includes('ucv')) domainHint=' site:ucvradio.cl';
+
+  const q=`"${title.replace(/"/g,'')}"${domainHint}`;
+  const url=bing(q);
+  const ctrl=new AbortController();
+  const timer=setTimeout(()=>ctrl.abort(),5000);
+  try{
+    const r=await fetch(url,{
+      headers:{'user-agent':'Mozilla/5.0 (compatible; ResumenPrensa/8.1)'},
+      signal:ctrl.signal,redirect:'follow'
+    });
+    if(!r.ok) return '';
+    const xml=await r.text();
+    const blocks=xml.match(/<item[\s\S]*?<\/item>/gi)||[];
+    for(const b of blocks.slice(0,8)){
+      const t=stripSourceSuffix(clean(tag(b,'title')),clean(tag(b,'source')));
+      let link=clean(tag(b,'link'));
+      if(!link){
+        const m=b.match(/<link[^>]+href=["']([^"']+)["']/i);
+        if(m) link=decodeXml(m[1]);
+      }
+      if(!link || isGoogleNewsUrl(link)) continue;
+      if(similarity(title,t)>=0.68){
+        return stripTracking(link);
+      }
+    }
+    return '';
+  }catch{return '';}
+  finally{clearTimeout(timer);}
+}
+
 async function enrichItem(item) {
   if (!item.url) return item;
+
+  let workingUrl=item.url;
+  if (isGoogleNewsUrl(workingUrl)) {
+    const resolved=await resolveDirectByTitle(item);
+    if (resolved) workingUrl=resolved;
+  }
+
   const ctrl=new AbortController();
   const timer=setTimeout(()=>ctrl.abort(),6500);
   try {
-    const r=await fetch(item.url,{
+    const r=await fetch(workingUrl,{
       headers:{
-        'user-agent':'Mozilla/5.0 (compatible; ResumenPrensa/8.0)',
+        'user-agent':'Mozilla/5.0 (compatible; ResumenPrensa/8.1)',
         'accept':'text/html,application/xhtml+xml'
       },
       signal:ctrl.signal,
@@ -436,7 +493,7 @@ async function enrichItem(item) {
     if (!r.ok) return item;
 
     const html=await r.text();
-    const finalUrl=r.url||item.url;
+    const finalUrl=r.url||workingUrl;
     const canonical=stripTracking(canonicalLink(html)||finalUrl);
     const ogTitle=metaContent(html,'property','og:title') || metaContent(html,'name','twitter:title');
     const ogDesc=metaContent(html,'property','og:description') || metaContent(html,'name','description') || metaContent(html,'name','twitter:description');
@@ -468,7 +525,7 @@ async function enrichItem(item) {
       summary,
       summaryFromArticle:!!articleSummary,
       summaryMethod:articleSummary?'article-body':(metaSummary?'meta-description':(feedSummary?'rss':'none')),
-      url:direct?canonical:stripTracking(item.url),
+      url:direct?canonical:stripTracking(workingUrl),
       reportUrl:direct?canonical:'',
       source:reportSourceName(source,canonical),
       direct,
@@ -647,7 +704,7 @@ module.exports=async function handler(req,res) {
     const quotas={national:4,regional:4,police:5,autopistas:2,paso:1};
     const used={national:0,regional:0,police:0,autopistas:0,paso:0};
     news=news.map(x=>{
-      const eligible=x.titleVerified && x.relevance!=='low' && x.scoreValue>=7 && !!x.summaryFromArticle && !!x.reportUrl;
+      const eligible=x.titleVerified && x.relevance!=='low' && x.scoreValue>=7 && !!x.reportUrl && (!!x.summaryFromArticle || (x.summaryVerified && x.summary && x.summary.length>=140));
       if (eligible && used[x.category] < (quotas[x.category]||0)) {
         x.included=true;
         used[x.category]++;
@@ -660,7 +717,7 @@ module.exports=async function handler(req,res) {
     res.setHeader('Pragma','no-cache');
     res.setHeader('Expires','0');
     return res.status(200).json({
-      news,count:news.length,start:start.toISOString(),end:end.toISOString(),version:'8.0',
+      news,count:news.length,start:start.toISOString(),end:end.toISOString(),version:'8.1',
       diagnostics:{feedsConsulted:jobs.length,raw:batches.flat().length,inPeriod:parsed.length,enriched:enriched.length,final:news.length}
     });
   } catch(e) {
