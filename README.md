@@ -1,16 +1,17 @@
-# Resumen de Prensa v3
+# Resumen de Prensa — versión estable
 
-PWA para generar informes AM/PM.
+Aplicación web estática + función serverless para Vercel.
 
-## Búsqueda automática
-La aplicación consulta resultados RSS de noticias y aplica:
-- AM: 17:15 del día anterior a 08:15 del día del informe.
-- PM: 08:15 a 17:15 del día del informe.
-- Contingencia Nacional.
-- Contingencia Regional.
-- Contingencia Policial Región de Valparaíso.
-- Detección de duplicados.
-- Relevancia alta/media/baja.
-- Revisión manual antes de generar el informe.
+## Funciones principales
+- Resumen AM: 17:15 del día anterior a 08:15 del día del informe.
+- Resumen PM: 08:15 a 17:15 del día del informe.
+- Búsqueda en fuentes abiertas mediante Google News RSS y respaldo Bing News RSS.
+- Clasificación: Contingencia Nacional, Contingencia Regional, Contingencia Policial, Autopistas y Paso Fronterizo Los Libertadores.
+- Cobertura reforzada para Región de Valparaíso, incluida Rapa Nui.
+- Revisión y selección manual antes de generar el informe.
+- Agregar noticias manualmente.
+- Copiar o compartir el informe final.
 
-La búsqueda en vivo depende de servicios externos gratuitos y puede presentar interrupciones.
+## Instalación en Vercel
+Subir estos archivos a la raíz del repositorio conservando la carpeta `api/search.js`.
+No requiere `npm install`, framework ni variables de entorno.

@@ -1,339 +1,215 @@
-const REGION_WORDS = [
-  "región de valparaíso","region de valparaiso","valparaíso","valparaiso",
-  "viña del mar","vina del mar","quilpué","quilpue","villa alemana",
-  "san antonio","concón","concon","quillota","los andes","san felipe",
-  "limache","la calera","quintero","puchuncaví","puchuncavi","casablanca",
-  "petorca","cabildo","la ligua","zapallar","papudo","nogales","hijuelas",
-  "olmue","olmué","el quisco","el tabo","algarrobo","cartagena",
-  "santo domingo","rapa nui","isla de pascua","hanga roa",
-  "juan fernández","juan fernandez"
+// Vercel Serverless Function - sin dependencias externas.
+// Devuelve noticias dentro del periodo exacto AM/PM solicitado por la interfaz.
+
+const REGION_TERMS = [
+  'valparaíso','valparaiso','viña del mar','vina del mar','quilpué','quilpue','villa alemana',
+  'concón','concon','quintero','puchuncaví','puchuncavi','quillota','la calera','nogales','hijuelas',
+  'limache','olmué','olmue','casablanca','san antonio','cartagena','el tabo','el quisco','algarrobo',
+  'santo domingo','la ligua','cabildo','petorca','papudo','zapallar','los andes','san felipe','calle larga',
+  'rinconada','panquehue','putaendo','catemu','llay-llay','rapa nui','isla de pascua','hanga roa',
+  'juan fernández','juan fernandez','robinson crusoe'
 ];
 
-const POLICE_WORDS = [
-  "pdi","policía de investigaciones","policia de investigaciones",
-  "carabineros","fiscalía","fiscalia","gendarmería","gendarmeria",
-  "homicidio","femicidio","parricidio","secuestro","robo","asalto",
-  "balacera","arma","armas","drogas","narcotráfico","narcotrafico",
-  "detenido","detenidos","detención","detencion","incautación","incautacion",
-  "allanamiento","crimen organizado","sicario","prisión preventiva",
-  "prision preventiva","microtráfico","microtrafico","lavado de activos"
+const POLICE_TERMS = [
+  'pdi','policía de investigaciones','policia de investigaciones','carabineros','fiscalía','fiscalia',
+  'gendarmería','gendarmeria','homicidio','femicidio','parricidio','secuestro','robo','asalto','balacera',
+  'arma','armas','drogas','narcotráfico','narcotrafico','microtráfico','microtrafico','detenido','detenidos',
+  'detención','detencion','incautación','incautacion','allanamiento','crimen organizado','sicario','prisión preventiva',
+  'prision preventiva','lavado de activos','tráfico de drogas','trafico de drogas','orden de detención','orden de detencion'
 ];
 
-const NATIONAL_WORDS = [
-  "gobierno","presidente","ministro","congreso","senado","diputados",
-  "seguridad nacional","seguridad interior","inteligencia",
-  "sistema de inteligencia","fuerzas armadas","proyecto de ley",
-  "terrorismo","atentado","frontera","macrozona","crimen organizado",
-  "terremoto","tsunami","incendio forestal","inundacion","inundación",
-  "aluvion","aluvión","temporal","tragedia","senapred","alerta roja",
-  "evacuacion","evacuación","homicidio"
+const REGIONAL_RELEVANCE = [
+  'emergencia','incendio','inundación','inundacion','temporal','aluvión','aluvion','evacuación','evacuacion',
+  'manifestación','manifestacion','protesta','marcha','huelga','paro','movilización','movilizacion','contaminación','contaminacion',
+  'derrame','corte de agua','corte de energía','corte de energia','autoridad','delegado presidencial','seremi','gobernador',
+  'alcalde','alcaldesa','corrupción','corrupcion','fraude','cohecho','malversación','malversacion','seguridad'
 ];
 
-const REGIONAL_WORDS = [
-  "alcalde","alcaldesa","gobernador","delegado presidencial","seremi",
-  "autoridad regional","emergencia","desastre","incendio","inundacion",
-  "inundación","temporal","tragedia","manifestacion","manifestación",
-  "protesta","marcha","medioambiental","ambiental","contaminacion",
-  "contaminación","estudiantes","universidad","sindicato","huelga",
-  "trabajadores","pescadores","paro","movilizacion","movilización",
-  "corrupcion","corrupción","cohecho","fraude","malversacion","malversación"
+const AUTOPISTA_TERMS = [
+  'ruta 68','rutas del pacífico','rutas del pacifico','ruta 60 ch','autopista los andes',
+  'ruta 5 norte','autopista del aconcagua','ruta 62','camino troncal','ruta 66','carretera de la fruta'
 ];
 
-function norm(s = "") {
+const PASO_TERMS = [
+  'paso los libertadores','paso fronterizo los libertadores','complejo los libertadores',
+  'sistema integrado cristo redentor','cristo redentor','alta montaña','alta montana'
+];
+
+const NATIONAL_RELEVANCE = [
+  'gobierno','presidente','ministro','ministerio de seguridad','seguridad pública','seguridad publica','inteligencia',
+  'fuerzas armadas','congreso','senado','cámara de diputados','camara de diputados','proyecto de ley','terrorismo',
+  'atentado','frontera','crimen organizado','macrozona','homicidios','terremoto','tsunami','senapred','alerta roja',
+  'incendio forestal','emergencia nacional','orden público','orden publico'
+];
+
+const LOW_VALUE = [
+  'cartelera','panorama','receta','horóscopo','horoscopo','festival gastronómico','festival gastronomico',
+  'concierto','estreno de película','estreno de pelicula','televisión','television','farándula','farandula'
+];
+
+function norm(s='') {
+  return String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
+}
+function hasAny(s, arr) { const n=norm(s); return arr.some(x=>n.includes(norm(x))); }
+function decodeXml(s='') {
   return String(s)
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+    .replace(/<!\[CDATA\[|\]\]>/g,'')
+    .replace(/&#(\d+);/g,(_,x)=>String.fromCodePoint(Number(x)))
+    .replace(/&#x([0-9a-f]+);/gi,(_,x)=>String.fromCodePoint(parseInt(x,16)))
+    .replace(/&nbsp;/gi,' ').replace(/&amp;/gi,'&').replace(/&quot;/gi,'"')
+    .replace(/&#39;|&apos;/gi,"'").replace(/&lt;/gi,'<').replace(/&gt;/gi,'>');
 }
-
-function any(s, arr) {
-  const z = norm(s);
-  return arr.some(x => z.includes(norm(x)));
+function clean(s='') {
+  return decodeXml(s).replace(/<script[\s\S]*?<\/script>/gi,' ').replace(/<style[\s\S]*?<\/style>/gi,' ')
+    .replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
 }
-
-function decodeXml(s = "") {
-  return String(s)
-    .replace(/<!\[CDATA\[|\]\]>/g, "")
-    .replace(/&#(\d+);/g, (_, x) => String.fromCodePoint(Number(x)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, x) => String.fromCodePoint(parseInt(x, 16)))
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;|&apos;/gi, "'")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">");
+function tag(block,name) {
+  const m=block.match(new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${name}>`,'i'));
+  return m ? decodeXml(m[1]).trim() : '';
 }
-
-function clean(s = "") {
-  return decodeXml(s)
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\{\{\{?[\s\S]*?\}\}\}?/g, " ")
-    .replace(/\\n/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+function sourceFrom(link, explicit='') {
+  if (explicit) return clean(explicit);
+  try { return new URL(link).hostname.replace(/^www\./,''); } catch { return ''; }
 }
-
-function tag(block, name) {
-  const m = block.match(
-    new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${name}>`, "i")
-  );
-  return m ? decodeXml(m[1]).trim() : "";
+function score(text, category) {
+  let s=0;
+  if (category==='police' && hasAny(text,POLICE_TERMS)) s+=6;
+  if (category==='regional' && hasAny(text,REGION_TERMS)) s+=4;
+  if (category==='regional' && hasAny(text,REGIONAL_RELEVANCE)) s+=2;
+  if (category==='national' && hasAny(text,NATIONAL_RELEVANCE)) s+=4;
+  if (category==='autopistas') s+=6;
+  if (category==='paso') s+=6;
+  if (hasAny(text,['homicidio','secuestro','atentado','fallecido','muerto','heridos','alerta roja','evacuación','evacuacion'])) s+=1;
+  if (hasAny(text,LOW_VALUE)) s-=5;
+  return s;
 }
-
-function classify(text, hint) {
-  const regional = any(text, REGION_WORDS);
-  const police = any(text, POLICE_WORDS);
-
-  if (regional && police) return "police";
-  if (regional) return "regional";
-  if (hint === "police" && police) return "police";
-  return "national";
+function classify(text, hint='national') {
+  if (hasAny(text,PASO_TERMS)) return 'paso';
+  if (hasAny(text,AUTOPISTA_TERMS)) return 'autopistas';
+  const regional=hasAny(text,REGION_TERMS);
+  const police=hasAny(text,POLICE_TERMS);
+  if (regional && police) return 'police';
+  if (regional) return 'regional';
+  if (hint==='police' && police) return 'police';
+  return 'national';
 }
-
-function relevance(text, category) {
-  let score = 0;
-
-  if (category === "police" && any(text, POLICE_WORDS)) score += 4;
-  if (category === "regional" && any(text, REGION_WORDS)) score += 3;
-  if (category === "regional" && any(text, REGIONAL_WORDS)) score += 2;
-  if (category === "national" && any(text, NATIONAL_WORDS)) score += 3;
-
-  if (any(text, [
-    "homicidio","fallecido","muerto","heridos","secuestro",
-    "alerta roja","evacuacion","evacuación","atentado"
-  ])) score++;
-
-  return score;
-}
-
-function parseFeed(xml, hint, provider) {
-  const blocks =
-    xml.match(/<item[\s\S]*?<\/item>/gi) ||
-    xml.match(/<entry[\s\S]*?<\/entry>/gi) ||
-    [];
-
-  return blocks.map(block => {
-    const title = clean(tag(block, "title"));
-
-    const summary =
-      clean(tag(block, "description")) ||
-      clean(tag(block, "summary")) ||
-      clean(tag(block, "content"));
-
-    let link = clean(tag(block, "link"));
-
+function parseFeed(xml,hint,provider) {
+  const blocks=xml.match(/<item[\s\S]*?<\/item>/gi) || xml.match(/<entry[\s\S]*?<\/entry>/gi) || [];
+  return blocks.map(block=>{
+    const title=clean(tag(block,'title'));
+    const summary=clean(tag(block,'description')) || clean(tag(block,'summary')) || clean(tag(block,'content'));
+    let link=clean(tag(block,'link'));
     if (!link) {
-      const m = block.match(/<link[^>]+href=["']([^"']+)["']/i);
-      if (m) link = decodeXml(m[1]);
+      const m=block.match(/<link[^>]+href=["']([^"']+)["']/i);
+      if (m) link=decodeXml(m[1]);
     }
-
-    const rawDate =
-      clean(tag(block, "pubDate")) ||
-      clean(tag(block, "published")) ||
-      clean(tag(block, "updated"));
-
-    const date = new Date(rawDate);
-
-    if (!title || Number.isNaN(date.getTime())) return null;
-
-    const text = `${title} ${summary}`;
-    const category = classify(text, hint);
-    const score = relevance(text, category);
-
-    let source = clean(tag(block, "source"));
-
-    if (!source && link) {
-      try {
-        source = new URL(link).hostname.replace(/^www\./, "");
-      } catch {}
-    }
-
+    const rawDate=clean(tag(block,'pubDate')) || clean(tag(block,'published')) || clean(tag(block,'updated'));
+    const published=new Date(rawDate);
+    if (!title || Number.isNaN(published.getTime())) return null;
+    const source=sourceFrom(link,tag(block,'source'));
+    const text=`${title} ${summary} ${source}`;
+    const category=classify(text,hint);
+    const sc=score(text,category);
+    if (sc<0) return null;
     return {
-      title: title.slice(0, 220),
-      summary: (summary || `Información publicada por ${source || "la fuente"}.`)
-        .slice(0, 1000),
-      url: link,
-      published: date.toISOString(),
+      title:title.slice(0,220),
+      summary:(summary || `Información publicada por ${source || 'la fuente consultada'}.`).slice(0,1100),
+      url:link,
       source,
+      published:published.toISOString(),
       category,
-      relevance:
-        score >= 5 ? "high" :
-        score >= 3 ? "medium" : "low",
-      included: score >= 3,
+      relevance:sc>=6?'high':sc>=3?'medium':'low',
+      included:sc>=3,
       provider
     };
   }).filter(Boolean);
 }
-
-function bing(q) {
-  return "https://www.bing.com/news/search?q=" +
-    encodeURIComponent(q) +
-    '&setmkt=es-CL&qft=interval%3d%227%22&format=RSS';
-}
-
 function google(q) {
-  return "https://news.google.com/rss/search?q=" +
-    encodeURIComponent(q) +
-    "&hl=es-419&gl=CL&ceid=CL:es-419";
+  return `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=es-419&gl=CL&ceid=CL:es-419`;
 }
-
-async function getFeed(url, hint, provider) {
+function bing(q) {
+  return `https://www.bing.com/news/search?q=${encodeURIComponent(q)}&setmkt=es-CL&format=RSS`;
+}
+async function fetchFeed(url,hint,provider) {
+  const ctrl=new AbortController();
+  const timer=setTimeout(()=>ctrl.abort(),8000);
   try {
-    const r = await fetch(url, {
-      headers: {
-        "user-agent": "Mozilla/5.0",
-        "accept": "application/rss+xml,application/xml,text/xml,*/*"
-      },
-      redirect: "follow"
-    });
-
+    const r=await fetch(url,{headers:{'user-agent':'Mozilla/5.0 (compatible; ResumenPrensa/1.0)','accept':'application/rss+xml,application/xml,text/xml,*/*'},signal:ctrl.signal,redirect:'follow'});
     if (!r.ok) return [];
-
-    const xml = await r.text();
-    return parseFeed(xml, hint, provider);
-  } catch {
-    return [];
-  }
+    return parseFeed(await r.text(),hint,provider);
+  } catch { return []; }
+  finally { clearTimeout(timer); }
 }
-
-function queries() {
+function dateClause(start,end) {
+  const a=new Date(start), b=new Date(end);
+  const ymd=d=>`${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
+  const before=new Date(b.getTime()+24*60*60*1000);
+  return ` after:${ymd(a)} before:${ymd(before)}`;
+}
+function queries(start,end) {
+  const dc=dateClause(start,end);
   return [
-    [
-      "national",
-      'Chile (Gobierno OR seguridad OR inteligencia OR emergencia OR protesta OR homicidios OR PDI OR Carabineros OR Congreso)'
-    ],
-    [
-      "national",
-      'Chile (terrorismo OR atentado OR frontera OR "crimen organizado" OR "proyecto de ley" OR temporal OR incendio)'
-    ],
-    [
-      "regional",
-      '("Región de Valparaíso" OR Valparaíso OR "Viña del Mar" OR Quilpué OR "Villa Alemana" OR Concón OR Quillota OR "San Antonio" OR "Los Andes" OR "San Felipe") (emergencia OR autoridad OR protesta OR contaminación OR huelga OR corrupción OR temporal OR incendio OR transporte)'
-    ],
-    [
-      "regional",
-      '("Rapa Nui" OR "Isla de Pascua" OR "Hanga Roa") (emergencia OR temporal OR incendio OR accidente OR autoridad OR protesta OR seguridad OR aeropuerto OR tsunami OR evacuación)'
-    ],
-    [
-      "police",
-      '(Valparaíso OR "Viña del Mar" OR Quilpué OR "Villa Alemana" OR Concón OR Quillota OR Quintero OR "La Ligua" OR "San Antonio" OR "Los Andes" OR "San Felipe") (PDI OR Carabineros OR Fiscalía OR homicidio OR secuestro OR robo OR drogas OR detenido OR balacera OR microtráfico)'
-    ],
-    [
-      "regional",
-      '("Ruta 68" OR "Ruta 60 CH" OR "Ruta 5 Norte" OR "Ruta 62" OR "Ruta 66" OR "Autopista Los Andes" OR "Autopista del Aconcagua" OR "Carretera de la Fruta") (accidente OR cierre OR corte OR congestión OR desvío OR tránsito OR emergencia)'
-    ],
-    [
-      "regional",
-      '("Paso Los Libertadores" OR "Paso Fronterizo Los Libertadores" OR "Cristo Redentor") (abierto OR cerrado OR cierre OR habilitado OR suspendido OR nieve OR viento OR tránsito OR temporal)'
-    ]
+    ['national',`Chile seguridad PDI Carabineros homicidios crimen organizado Gobierno Congreso inteligencia emergencia${dc}`],
+    ['national',`Chile atentado terrorismo frontera orden público incendio forestal SENAPRED Fuerzas Armadas${dc}`],
+    ['regional',`Valparaíso OR "Viña del Mar" OR Quilpué OR "Villa Alemana" OR Concón OR Quillota OR "San Antonio" emergencia protesta autoridad seguridad${dc}`],
+    ['regional',`Quintero OR Puchuncaví OR Limache OR "La Calera" OR "La Ligua" OR "Los Andes" OR "San Felipe" emergencia seguridad protesta${dc}`],
+    ['regional',`"Rapa Nui" OR "Isla de Pascua" OR "Hanga Roa" emergencia seguridad aeropuerto tsunami temporal${dc}`],
+    ['police',`Valparaíso PDI Carabineros Fiscalía homicidio robo drogas detenido secuestro${dc}`],
+    ['regional',`site:observador.cl Valparaíso policial seguridad${dc}`],
+    ['regional',`site:puranoticia.cl Valparaíso policial seguridad${dc}`],
+    ['regional',`site:g5noticias.cl Valparaíso policial seguridad${dc}`],
+    ['autopistas',`"Ruta 68" OR "Ruta 60 CH" OR "Ruta 5 Norte" OR "Ruta 62" OR "Ruta 66" accidente cierre tránsito congestión${dc}`],
+    ['paso',`"Paso Los Libertadores" OR "Cristo Redentor" abierto cerrado nieve viento tránsito${dc}`]
   ];
 }
-
-function eventKey(item) {
-  let s = norm(item.title)
-    .replace(/[^a-z0-9ñ ]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  const words = s
-    .split(" ")
-    .filter(w => w.length > 3)
-    .slice(0, 12);
-
-  return words.join(" ");
+function eventKey(x) {
+  const stop=new Set(['para','desde','sobre','entre','ante','tras','este','esta','estos','estas','chile','region','valparaiso','noticia','hoy']);
+  return norm(`${x.title} ${x.source}`).replace(/[^a-z0-9ñ ]/g,' ').split(' ').filter(w=>w.length>3&&!stop.has(w)).slice(0,12).join('|');
 }
-
 function dedupe(items) {
-  const map = new Map();
-
-  for (const item of items) {
-    const key = eventKey(item);
-
-    if (!map.has(key)) {
-      map.set(key, item);
-      continue;
-    }
-
-    const old = map.get(key);
-
-    const score = x =>
-      x.relevance === "high" ? 3 :
-      x.relevance === "medium" ? 2 : 1;
-
-    if (score(item) > score(old)) {
-      map.set(key, item);
-    }
+  const rank=x=>(x.relevance==='high'?3:x.relevance==='medium'?2:1)+(x.source?0.2:0);
+  const m=new Map();
+  for (const x of items) {
+    const k=eventKey(x);
+    if (!m.has(k) || rank(x)>rank(m.get(k))) m.set(k,x);
   }
-
-  return [...map.values()];
+  return [...m.values()];
 }
 
-export default async function handler(req, res) {
+module.exports = async function handler(req,res) {
+  if (req.method!=='GET') return res.status(405).json({error:'Método no permitido'});
   try {
-    const start = new Date(req.query.start);
-    const end = new Date(req.query.end);
-
-    if (
-      Number.isNaN(start.getTime()) ||
-      Number.isNaN(end.getTime())
-    ) {
-      return res.status(400).json({
-        error: "Rango de fechas inválido"
-      });
+    const start=new Date(req.query.start);
+    const end=new Date(req.query.end);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start>=end) {
+      return res.status(400).json({error:'Rango de fechas inválido'});
     }
-
-    const tasks = [];
-
-    for (const [hint, q] of queries()) {
-      tasks.push(getFeed(bing(q), hint, "bing"));
-      tasks.push(getFeed(google(q), hint, "google"));
+    const defs=queries(start,end);
+    const jobs=[];
+    for (const [hint,q] of defs) {
+      jobs.push(fetchFeed(google(q),hint,'Google News'));
+      // Bing se usa como respaldo en consultas principales; evita sobrecargar la función.
+      if (['national','police','regional'].includes(hint) && jobs.length<14) jobs.push(fetchFeed(bing(q),hint,'Bing News'));
     }
-
-    const results = await Promise.all(tasks);
-
-    let news = results
-      .flat()
-      .filter(item => {
-        const d = new Date(item.published);
-        return d >= start && d <= end;
-      });
-
-    news = dedupe(news);
-
-    news.sort((a, b) => {
-      const score = x =>
-        x.relevance === "high" ? 3 :
-        x.relevance === "medium" ? 2 : 1;
-
-      if (score(b) !== score(a)) {
-        return score(b) - score(a);
-      }
-
-      return new Date(b.published) - new Date(a.published);
+    const batches=await Promise.all(jobs);
+    const parsed=batches.flat();
+    let news=parsed.filter(x=>{
+      const d=new Date(x.published);
+      return d>=start && d<=end;
     });
-
-    news = news.slice(0, 80);
-
-    res.setHeader(
-      "Cache-Control",
-      "s-maxage=180, stale-while-revalidate=300"
-    );
-
+    news=dedupe(news).sort((a,b)=>{
+      const r=x=>x.relevance==='high'?3:x.relevance==='medium'?2:1;
+      return (r(b)-r(a)) || (new Date(b.published)-new Date(a.published));
+    }).slice(0,100);
+    res.setHeader('Cache-Control','s-maxage=120, stale-while-revalidate=240');
     return res.status(200).json({
       news,
-      count: news.length,
-      start: start.toISOString(),
-      end: end.toISOString()
+      count:news.length,
+      start:start.toISOString(),
+      end:end.toISOString(),
+      diagnostics:{feedsConsulted:jobs.length,parsed:parsed.length,inPeriod:news.length}
     });
-
   } catch (e) {
-    return res.status(500).json({
-      error: "No fue posible consultar noticias",
-      detail: String(e?.message || e)
-    });
+    return res.status(500).json({error:'No fue posible consultar noticias',detail:String(e && e.message ? e.message : e)});
   }
-    
+};

@@ -1,70 +1,314 @@
 <!doctype html>
 <html lang="es">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0f2d4a">
-<title>Resumen de Prensa</title>
-<style>
-*{box-sizing:border-box}:root{--bg:#f3f6f9;--ink:#172133;--muted:#667085;--line:#d9e1ea;--navy:#0f2d4a;--accent:#a9801c}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
-header{background:var(--navy);color:white;padding:16px}header h1{margin:2px 0;font-size:23px}header small{opacity:.75;font-weight:800;letter-spacing:.12em}
-main{max-width:920px;margin:auto;padding:15px}.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px}
-button,input,textarea,select{font:inherit}button{border:1px solid var(--line);background:#fff;color:var(--navy);border-radius:10px;padding:10px 13px;font-weight:800}
-#search,.active{background:var(--navy);color:white}.accent{background:var(--accent);color:white;border-color:var(--accent)}
-.switch,.actions,.tabs{display:flex;gap:8px;flex-wrap:wrap}.switch{margin-bottom:12px}.actions{margin-top:12px}.tabs{margin-bottom:10px;overflow:auto}.tabs button{white-space:nowrap;border-radius:999px;padding:7px 11px}
-label{display:flex;flex-direction:column;gap:6px;font-weight:750;font-size:13px}input,textarea,select{border:1px solid var(--line);border-radius:9px;padding:10px;width:100%;background:#fff}
-.hero{display:grid;grid-template-columns:1fr 1.35fr;gap:14px}.period{border-left:4px solid var(--accent);background:#fbf8ee;border-radius:10px;padding:10px 12px}.period span{font-size:11px;color:#77621c;font-weight:800}.period strong{display:block}
-.notice{font-size:13px;color:#455268;margin-top:12px}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:14px}.stat{background:#fff;border:1px solid var(--line);border-radius:13px;padding:12px}.stat span{font-size:11px;color:var(--muted);display:block}.stat strong{font-size:22px;color:var(--navy)}
-.item{border:1px solid var(--line);border-radius:12px;padding:12px;margin:9px 0}.item h3{font-size:15px;margin:0 0 6px}.meta{font-size:11px;color:var(--muted);display:flex;gap:7px;flex-wrap:wrap}.badge{padding:3px 7px;border-radius:999px;background:#edf2f6;font-weight:800}.item p{font-size:13px;line-height:1.45;color:#455268}.include{display:flex;flex-direction:row;align-items:center;gap:7px}.include input{width:auto}
-#result{width:100%;min-height:440px;margin-top:12px;font-family:monospace;line-height:1.45}.hidden{display:none!important}
-dialog{width:min(680px,94vw);border:0;border-radius:16px}dialog::backdrop{background:rgba(0,0,0,.45)}#form{display:flex;flex-direction:column;gap:10px}.small{font-size:12px;color:var(--muted)}
-@media(max-width:720px){.hero{grid-template-columns:1fr}.stats{grid-template-columns:1fr 1fr}}
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#123657">
+  <meta name="description" content="Generador AM/PM de Resumen de Prensa para revisión de contingencia nacional y Región de Valparaíso.">
+  <title>Resumen de Prensa</title>
+  <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-<header><small>TRABAJO · PRENSA</small><h1>Resumen de Prensa</h1></header>
+<header>
+  <small>TRABAJO · PRENSA</small>
+  <h1>Resumen de Prensa</h1>
+</header>
 <main>
-<section class="card">
-<div class="hero">
-<div><div class="switch"><button id="am" class="active">AM</button><button id="pm">PM</button></div><label>Fecha del informe<input id="date" type="date"></label></div>
-<div class="period"><span>PERIODO ANALIZADO</span><strong id="period"></strong><div class="small">Se considera la hora de publicación de la fuente.</div></div>
-</div>
-<div class="actions"><button id="search">🔎 Buscar noticias</button><button id="manual">+ Agregar manualmente</button><button id="generate" class="accent">Generar resumen</button></div>
-<div id="status" class="notice"></div>
-</section>
-<section class="stats">
-<div class="stat"><span>Encontradas</span><strong id="sTotal">0</strong></div><div class="stat"><span>Seleccionadas</span><strong id="sInc">0</strong></div><div class="stat"><span>Nacional</span><strong id="sNat">0</strong></div><div class="stat"><span>Regional/Policial</span><strong id="sReg">0</strong></div>
-</section>
-<section class="card"><h2>Revisión de noticias</h2><div class="tabs"><button data-filter="all" class="active">Todas</button><button data-filter="national">Nacional</button><button data-filter="regional">Regional</button><button data-filter="police">Policial</button></div><div id="news"></div><p id="empty" class="small">Sin noticias. Presiona “Buscar noticias”.</p></section>
-<section class="card hidden" id="resultCard"><h2>Informe generado</h2><div class="actions"><button id="copy">Copiar</button><button id="share">Compartir</button></div><textarea id="result"></textarea></section>
+  <section class="card">
+    <div class="hero">
+      <div>
+        <div class="switch">
+          <button id="am" class="active" type="button">AM</button>
+          <button id="pm" type="button">PM</button>
+        </div>
+        <label>Fecha del informe
+          <input id="date" type="date">
+        </label>
+      </div>
+      <div class="period">
+        <span>PERIODO ANALIZADO</span>
+        <strong id="period">—</strong>
+        <div class="small">AM: 17:15 del día anterior a 08:15 del día del informe. PM: 08:15 a 17:15 del día del informe.</div>
+      </div>
+    </div>
+    <div class="actions">
+      <button id="search" class="primary" type="button">🔎 Buscar noticias</button>
+      <button id="manual" type="button">+ Agregar manualmente</button>
+      <button id="generate" class="gold" type="button">Generar resumen</button>
+    </div>
+    <div id="status" class="notice" aria-live="polite"></div>
+  </section>
+
+  <section class="stats">
+    <div class="stat"><span>Encontradas</span><strong id="sTotal">0</strong></div>
+    <div class="stat"><span>Seleccionadas</span><strong id="sInc">0</strong></div>
+    <div class="stat"><span>Nacional</span><strong id="sNat">0</strong></div>
+    <div class="stat"><span>Regional/Policial</span><strong id="sReg">0</strong></div>
+  </section>
+
+  <section class="card">
+    <h2 class="section-title">Revisión de noticias</h2>
+    <div class="tabs">
+      <button data-filter="all" class="active" type="button">Todas</button>
+      <button data-filter="national" type="button">Nacional</button>
+      <button data-filter="regional" type="button">Regional</button>
+      <button data-filter="police" type="button">Policial</button>
+      <button data-filter="autopistas" type="button">Autopistas</button>
+      <button data-filter="paso" type="button">Paso Los Libertadores</button>
+    </div>
+    <div id="news"></div>
+    <p id="empty" class="small">Sin noticias cargadas. Presiona “Buscar noticias”.</p>
+  </section>
+
+  <section class="card hidden" id="resultCard">
+    <h2 class="section-title">Informe generado</h2>
+    <p class="small">Revisa el texto antes de enviarlo. Puedes editarlo directamente.</p>
+    <div class="actions">
+      <button id="copy" type="button">Copiar</button>
+      <button id="share" type="button">Compartir</button>
+    </div>
+    <textarea id="result" spellcheck="true"></textarea>
+  </section>
+
+  <div class="footer-note">Fuentes abiertas · selección y revisión manual antes de difusión.</div>
 </main>
-<dialog id="dlg"><form id="form"><h3>Agregar noticia</h3><input id="title" placeholder="Título" required><textarea id="summary" rows="6" placeholder="Resumen" required></textarea><input id="url" type="url" placeholder="Enlace"><input id="published" type="datetime-local" required><select id="category"><option value="national">CONTINGENCIA NACIONAL</option><option value="regional">CONTINGENCIA REGIONAL</option><option value="police">CONTINGENCIA POLICIAL</option></select><div class="actions"><button type="button" id="cancel">Cancelar</button><button type="submit">Guardar</button></div></form></dialog>
+
+<dialog id="dlg">
+  <form id="form">
+    <h3>Agregar noticia</h3>
+    <input id="title" placeholder="Título" required>
+    <textarea id="summary" rows="6" placeholder="Resumen objetivo" required></textarea>
+    <input id="url" type="url" placeholder="Enlace de la fuente">
+    <input id="published" type="datetime-local" required>
+    <select id="category">
+      <option value="national">CONTINGENCIA NACIONAL</option>
+      <option value="regional">CONTINGENCIA REGIONAL</option>
+      <option value="police">CONTINGENCIA POLICIAL</option>
+      <option value="autopistas">AUTOPISTAS</option>
+      <option value="paso">PASO FRONTERIZO LOS LIBERTADORES</option>
+    </select>
+    <div class="actions">
+      <button type="button" id="cancel">Cancelar</button>
+      <button type="submit" class="primary">Guardar</button>
+    </div>
+  </form>
+</dialog>
+
 <script>
-const $=x=>document.getElementById(x);let type="AM",items=[],filter="all";
-const pad=n=>String(n).padStart(2,"0");
-function range(){let[y,m,d]=$("date").value.split("-").map(Number);return type==="AM"?[new Date(y,m-1,d-1,17,15),new Date(y,m-1,d,8,15)]:[new Date(y,m-1,d,8,15),new Date(y,m-1,d,17,15)]}
-function fd(d){return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`}
-function update(){let[a,b]=range();$("period").textContent=`${fd(a)} → ${fd(b)}`;$("am").classList.toggle("active",type==="AM");$("pm").classList.toggle("active",type==="PM")}
-function stats(){$("sTotal").textContent=items.length;$("sInc").textContent=items.filter(x=>x.included).length;$("sNat").textContent=items.filter(x=>x.category==="national").length;$("sReg").textContent=items.filter(x=>x.category!=="national").length}
-function esc(s=""){return s.replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
-function render(){$("news").innerHTML="";let show=filter==="all"?items:items.filter(x=>x.category===filter);$("empty").hidden=show.length>0;show.sort((a,b)=>new Date(a.published)-new Date(b.published)).forEach(x=>{let e=document.createElement("div");e.className="item";e.innerHTML=`<h3>${esc(x.title)}</h3><div class="meta"><span class="badge">${x.category==="national"?"CONTINGENCIA NACIONAL":x.category==="regional"?"CONTINGENCIA REGIONAL":"CONTINGENCIA POLICIAL"}</span><span>${fd(new Date(x.published))}</span><span>${esc(x.source||"")}</span></div><p>${esc(x.summary||"")}</p>${x.url?`<a href="${x.url}" target="_blank">Abrir fuente</a>`:""}<label class="include"><input type="checkbox" ${x.included?"checked":""} data-id="${x.id}"> Incluir en informe</label>`;$("news").appendChild(e)});stats()}
-$("news").onchange=e=>{if(e.target.dataset.id){let x=items.find(i=>i.id===e.target.dataset.id);x.included=e.target.checked;stats()}}
-document.querySelectorAll("[data-filter]").forEach(b=>b.onclick=()=>{document.querySelectorAll("[data-filter]").forEach(x=>x.classList.remove("active"));b.classList.add("active");filter=b.dataset.filter;render()})
-async function search(){let btn=$("search"),[a,b]=range();btn.disabled=true;$("status").textContent="Buscando noticias desde el servidor…";try{let q=new URLSearchParams({start:a.toISOString(),end:b.toISOString(),type,date:$("date").value});let r=await fetch("/api/search?"+q.toString(),{cache:"no-store"});if(!r.ok)throw Error("HTTP "+r.status);let data=await r.json();items=(data.news||[]).map(x=>({...x,id:crypto.randomUUID(),included:x.included!==false}));render();$("status").textContent=items.length?`Se encontraron ${items.length} noticias dentro del periodo. Revísalas antes de generar el informe.`:"La búsqueda terminó sin resultados dentro del periodo seleccionado."}catch(e){$("status").textContent="No fue posible consultar el servidor de noticias. Revisa que el backend /api/search esté publicado en Vercel."}finally{btn.disabled=false}}
-function report(){let[y,m,d]=$("date").value.split("-");let o=`*RESUMEN DE PRENSA ${type} ${d}/${m}/${y}*
+const $ = id => document.getElementById(id);
+const pad = n => String(n).padStart(2,"0");
+let type = "AM";
+let items = [];
+let filter = "all";
 
-`;for(let c of["national","regional","police"]){let name=c==="national"?"CONTINGENCIA NACIONAL":c==="regional"?"CONTINGENCIA REGIONAL":"CONTINGENCIA POLICIAL";o+=`*${name}*
+function localISODate(d = new Date()) {
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
 
-`;items.filter(x=>x.included&&x.category===c).forEach(x=>{o+=`*${x.title}*
+function ensureDate() {
+  if (!$('date').value) $('date').value = localISODate();
+  return $('date').value;
+}
 
-${x.summary}
+function range() {
+  const value = ensureDate();
+  const [y,m,d] = value.split('-').map(Number);
+  if (!y || !m || !d) throw new Error('Selecciona una fecha válida.');
+  return type === 'AM'
+    ? [new Date(y,m-1,d-1,17,15,0,0), new Date(y,m-1,d,8,15,0,0)]
+    : [new Date(y,m-1,d,8,15,0,0), new Date(y,m-1,d,17,15,0,0)];
+}
 
-${x.url?x.url+"
+function fd(d) {
+  return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
-":""}`})}return o.trim()}
-$("am").onclick=()=>{type="AM";update()};$("pm").onclick=()=>{type="PM";update()};$("date").onchange=update;$("search").onclick=search;$("generate").onclick=()=>{$("result").value=report();$("resultCard").classList.remove("hidden");$("resultCard").scrollIntoView({behavior:"smooth"})};$("copy").onclick=async()=>navigator.clipboard.writeText($("result").value);$("share").onclick=()=>navigator.share?navigator.share({text:$("result").value}):navigator.clipboard.writeText($("result").value);
-$("manual").onclick=()=>{$("form").reset();$("dlg").showModal()};$("cancel").onclick=()=>$("dlg").close();$("form").onsubmit=e=>{e.preventDefault();items.push({id:crypto.randomUUID(),title:$("title").value,summary:$("summary").value,url:$("url").value,published:$("published").value,category:$("category").value,source:"Manual",included:true});render();$("dlg").close()};
-let n=new Date();$("date").value=`${n.getFullYear()}-${pad(n.getMonth()+1)}-${pad(n.getDate())}`;update();
+function updatePeriod() {
+  try {
+    const [a,b] = range();
+    $('period').textContent = `${fd(a)} → ${fd(b)}`;
+  } catch {
+    $('period').textContent = 'Selecciona una fecha válida';
+  }
+  $('am').classList.toggle('active', type === 'AM');
+  $('pm').classList.toggle('active', type === 'PM');
+}
+
+function esc(s='') {
+  return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+}
+
+function catLabel(c) {
+  return ({
+    national:'CONTINGENCIA NACIONAL',
+    regional:'CONTINGENCIA REGIONAL',
+    police:'CONTINGENCIA POLICIAL',
+    autopistas:'AUTOPISTAS',
+    paso:'PASO FRONTERIZO LOS LIBERTADORES'
+  })[c] || 'OTROS';
+}
+
+function stats() {
+  $('sTotal').textContent = items.length;
+  $('sInc').textContent = items.filter(x=>x.included).length;
+  $('sNat').textContent = items.filter(x=>x.category==='national').length;
+  $('sReg').textContent = items.filter(x=>['regional','police'].includes(x.category)).length;
+}
+
+function render() {
+  $('news').innerHTML = '';
+  const show = filter === 'all' ? [...items] : items.filter(x=>x.category===filter);
+  $('empty').hidden = show.length > 0;
+  show.sort((a,b)=>new Date(b.published)-new Date(a.published)).forEach(x=>{
+    const e = document.createElement('div');
+    e.className = 'item';
+    const rel = x.relevance || 'medium';
+    e.innerHTML = `
+      <h3>${esc(x.title)}</h3>
+      <div class="meta">
+        <span class="badge">${catLabel(x.category)}</span>
+        <span class="badge ${esc(rel)}">${rel==='high'?'Alta':rel==='medium'?'Media':'Baja'}</span>
+        <span>${fd(new Date(x.published))}</span>
+        <span>${esc(x.source||'')}</span>
+      </div>
+      <p>${esc(x.summary||'')}</p>
+      ${x.url ? `<a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">Abrir fuente</a>` : ''}
+      <label class="include"><input type="checkbox" ${x.included?'checked':''} data-id="${x.id}"> Incluir en informe</label>`;
+    $('news').appendChild(e);
+  });
+  stats();
+}
+
+$('news').addEventListener('change', e=>{
+  const id = e.target?.dataset?.id;
+  if (!id) return;
+  const x = items.find(i=>i.id===id);
+  if (x) x.included = e.target.checked;
+  stats();
+});
+
+document.querySelectorAll('[data-filter]').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    document.querySelectorAll('[data-filter]').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    filter = b.dataset.filter;
+    render();
+  });
+});
+
+async function searchNews() {
+  const btn = $('search');
+  $('status').className = 'notice';
+  try {
+    const [a,b] = range();
+    btn.disabled = true;
+    $('status').textContent = 'Buscando noticias en fuentes abiertas…';
+    const q = new URLSearchParams({
+      start:a.toISOString(),
+      end:b.toISOString(),
+      type,
+      date:ensureDate()
+    });
+    const r = await fetch('/api/search?'+q.toString(), {cache:'no-store'});
+    const data = await r.json().catch(()=>({}));
+    if (!r.ok) throw new Error(data.error || `Error HTTP ${r.status}`);
+    items = (data.news || []).map(x=>({
+      ...x,
+      id:(crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)),
+      included:x.included !== false
+    }));
+    render();
+    if (items.length) {
+      $('status').className = 'notice ok';
+      $('status').textContent = `Búsqueda completada: ${items.length} noticias encontradas. Revisa y selecciona antes de generar el informe.`;
+    } else {
+      $('status').textContent = 'La búsqueda finalizó sin noticias dentro del período seleccionado. Puedes agregar antecedentes manualmente.';
+    }
+  } catch (e) {
+    console.error(e);
+    $('status').className = 'notice error';
+    $('status').textContent = `No fue posible completar la búsqueda: ${e.message || 'error desconocido'}.`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function cleanSummary(s='') {
+  return String(s).replace(/\s+/g,' ').trim();
+}
+
+function sectionText(category, emptyText='Sin novedades de interés verificables dentro del periodo analizado.') {
+  const selected = items.filter(x=>x.included && x.category===category);
+  let out = `*${catLabel(category)}*\n\n`;
+  if (!selected.length) return out + emptyText + '\n\n';
+  for (const x of selected) {
+    out += `*${cleanSummary(x.title)}*\n\n`;
+    out += `${cleanSummary(x.summary)}\n\n`;
+    if (x.url) out += `${x.url}\n\n`;
+  }
+  return out;
+}
+
+function report() {
+  const [y,m,d] = ensureDate().split('-');
+  let o = `*RESUMEN DE PRENSA ${type} ${d}/${m}/${y}*\n\n`;
+  o += sectionText('national');
+  o += sectionText('regional');
+  o += sectionText('police');
+  o += sectionText('autopistas','No se identificaron novedades operacionales recientes verificables en las fuentes consultadas.');
+  o += sectionText('paso','No se identificó información reciente verificable respecto del estado del Paso Fronterizo Los Libertadores en las fuentes consultadas.');
+  return o.trim();
+}
+
+$('am').addEventListener('click', ()=>{type='AM';updatePeriod()});
+$('pm').addEventListener('click', ()=>{type='PM';updatePeriod()});
+$('date').addEventListener('change', updatePeriod);
+$('search').addEventListener('click', searchNews);
+$('generate').addEventListener('click', ()=>{
+  $('result').value = report();
+  $('resultCard').classList.remove('hidden');
+  $('resultCard').scrollIntoView({behavior:'smooth',block:'start'});
+});
+$('copy').addEventListener('click', async()=>{
+  await navigator.clipboard.writeText($('result').value);
+  $('status').className='notice ok';
+  $('status').textContent='Resumen copiado al portapapeles.';
+});
+$('share').addEventListener('click', async()=>{
+  const text = $('result').value;
+  if (navigator.share) await navigator.share({text});
+  else {
+    await navigator.clipboard.writeText(text);
+    $('status').className='notice ok';
+    $('status').textContent='Tu equipo no permite compartir directamente; el resumen quedó copiado.';
+  }
+});
+$('manual').addEventListener('click', ()=>{
+  $('form').reset();
+  const now = new Date();
+  $('published').value = `${localISODate(now)}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  $('dlg').showModal();
+});
+$('cancel').addEventListener('click', ()=>$('dlg').close());
+$('form').addEventListener('submit', e=>{
+  e.preventDefault();
+  items.push({
+    id:(crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)),
+    title:$('title').value.trim(),
+    summary:$('summary').value.trim(),
+    url:$('url').value.trim(),
+    published:new Date($('published').value).toISOString(),
+    category:$('category').value,
+    source:'Manual',
+    relevance:'high',
+    included:true
+  });
+  render();
+  $('dlg').close();
+});
+
+$('date').value = localISODate();
+updatePeriod();
 </script>
-</body></html>
+</body>
+</html>
