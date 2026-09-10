@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <meta name="description" content="Generador AM/PM de Resumen de Prensa para revisión de contingencia nacional y Región de Valparaíso.">
-  <title>Resumen de Prensa</title>
+  <title>Resumen de Prensa · V4</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
@@ -174,8 +174,19 @@ function render() {
         <span>${fd(new Date(x.published))}</span>
         <span>${esc(x.source||'')}</span>
       </div>
-      <p>${esc(x.summary||'')}</p>
+      <p>${x.summary ? esc(x.summary) : '<em>Resumen no disponible automáticamente. Revisa la fuente antes de incluir esta noticia.</em>'}</p>
       ${x.url ? `<a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">Abrir fuente</a>` : ''}
+      <div class="meta">
+        <label>Categoría:
+          <select data-cat-id="${x.id}">
+            <option value="national" ${x.category==='national'?'selected':''}>Nacional</option>
+            <option value="regional" ${x.category==='regional'?'selected':''}>Regional</option>
+            <option value="police" ${x.category==='police'?'selected':''}>Policial</option>
+            <option value="autopistas" ${x.category==='autopistas'?'selected':''}>Autopistas</option>
+            <option value="paso" ${x.category==='paso'?'selected':''}>Paso Fronterizo</option>
+          </select>
+        </label>
+      </div>
       <label class="include"><input type="checkbox" ${x.included?'checked':''} data-id="${x.id}"> Incluir en informe</label>`;
     $('news').appendChild(e);
   });
@@ -183,6 +194,13 @@ function render() {
 }
 
 $('news').addEventListener('change', e=>{
+  const catId = e.target?.dataset?.catId;
+  if (catId) {
+    const x = items.find(i=>i.id===catId);
+    if (x) x.category = e.target.value;
+    render();
+    return;
+  }
   const id = e.target?.dataset?.id;
   if (!id) return;
   const x = items.find(i=>i.id===id);
@@ -212,6 +230,7 @@ async function searchNews() {
       type,
       date:ensureDate()
     });
+    q.set('_v','4');
     const r = await fetch('/api/search?'+q.toString(), {cache:'no-store'});
     const data = await r.json().catch(()=>({}));
     console.log('Resumen de Prensa API', data.version || 'sin versión');
@@ -219,12 +238,12 @@ async function searchNews() {
     items = (data.news || []).map(x=>({
       ...x,
       id:(crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)),
-      included:x.included !== false
+      included:x.included === true
     }));
     render();
     if (items.length) {
       $('status').className = 'notice ok';
-      $('status').textContent = `Búsqueda completada: ${items.length} noticias encontradas. Revisa y selecciona antes de generar el informe.`;
+      $('status').textContent = `Búsqueda completada: ${items.length} noticias encontradas; ${items.filter(x=>x.included).length} preseleccionadas por calidad y relevancia. Revisa antes de generar el informe.`;
     } else {
       $('status').textContent = 'La búsqueda finalizó sin noticias dentro del período seleccionado. Puedes agregar antecedentes manualmente.';
     }
@@ -247,8 +266,10 @@ function sectionText(category, emptyText='Sin novedades de interés verificables
   if (!selected.length) return out + emptyText + '\n\n';
   for (const x of selected) {
     out += `*${cleanSummary(x.title)}*\n\n`;
-    out += `${cleanSummary(x.summary)}\n\n`;
+    if (cleanSummary(x.summary)) out += `${cleanSummary(x.summary)}\n\n`;
+    if (x.source) out += `Fuente: ${cleanSummary(x.source)}\n`;
     if (x.url) out += `${x.url}\n\n`;
+    else out += `\n`;
   }
   return out;
 }
