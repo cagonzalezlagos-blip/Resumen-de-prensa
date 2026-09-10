@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <meta name="description" content="Generador AM/PM de Resumen de Prensa para revisión de contingencia nacional y Región de Valparaíso.">
-  <title>Resumen de Prensa · V8.2</title>
+  <title>Resumen de Prensa · V8.3</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
@@ -65,7 +65,7 @@
 
   <section class="card hidden" id="resultCard">
     <h2 class="section-title">Informe generado</h2>
-    <p class="small">Revisa el texto antes de enviarlo. La aplicación intenta leer el contenido real de cada noticia y resumir qué ocurrió, quiénes participaron, dónde, cuándo y las principales causas o consecuencias. Preselecciona noticias con enlace directo y resumen obtenido desde la fuente original. Los textos se depuran para mantener una redacción formal, clara y sin elementos ajenos al contenido periodístico.</p>
+    <p class="small">Revisa el texto antes de enviarlo. La aplicación intenta leer el contenido real de cada noticia y resumir qué ocurrió, quiénes participaron, dónde, cuándo y las principales causas o consecuencias. Preselecciona noticias con enlace directo y resumen obtenido desde la fuente original. Los textos se depuran para mantener una redacción formal, clara y comprensible, en uno o dos párrafos breves, sin elementos ajenos al contenido periodístico.</p>
     <div class="actions">
       <button id="copy" type="button">Copiar</button>
       <button id="share" type="button">Compartir</button>
@@ -231,7 +231,7 @@ async function searchNews() {
       type,
       date:ensureDate()
     });
-    q.set('_v','82');
+    q.set('_v','83');
     const r = await fetch('/api/search?'+q.toString(), {cache:'no-store'});
     const data = await r.json().catch(()=>({}));
     console.log('Resumen de Prensa API', data.version || 'sin versión');
@@ -267,9 +267,11 @@ function cleanReportText(s='') {
     .replace(/\bKeywords?\s*:\s*[^.]{0,500}(?:\.|$)/gi,' ')
     .replace(/\bTags?\s*:\s*[^.]{0,500}(?:\.|$)/gi,' ')
     .replace(/\bPublicidad\b/gi,' ')
+    .replace(/\bNewsletter\b[^.]{0,300}(?:\.|$)/gi,' ')
     .replace(/[•●▪■◆►▶]+/g,' ')
-    .replace(/\s+([,.;:!?])/g,'$1')
-    .replace(/\s{2,}/g,' ')
+    .replace(/[ \t]+([,.;:!?])/g,'$1')
+    .replace(/[ \t]{2,}/g,' ')
+    .replace(/\n{3,}/g,'\n\n')
     .trim();
 }
 function sectionText(category, emptyText='Sin novedades de interés verificables dentro del periodo analizado.') {
