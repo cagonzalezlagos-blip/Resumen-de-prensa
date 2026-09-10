@@ -1,4 +1,4 @@
-// Resumen de Prensa V7 - Vercel Serverless Function
+// Resumen de Prensa V7.1 - Vercel Serverless Function
 // Búsqueda AM/PM en fuentes abiertas, con filtros, enriquecimiento y deduplicación.
 
 const REGION_TERMS = [
@@ -237,7 +237,7 @@ function parseFeed(xml,hint,provider) {
     const title=stripSourceSuffix(rawTitle,source).slice(0,260);
     const text=`${title} ${rawSummary} ${source}`;
     const category=classify(text,hint,source);
-    if (!relevant(text,category,x.source)) return null;
+    if (!relevant(text,category,source)) return null;
     const summary=usableSummary(title,rawSummary,source);
     return {title,summary,url:link,source,published:published.toISOString(),category,hint,provider};
   }).filter(Boolean);
@@ -252,7 +252,7 @@ async function fetchFeed(url,hint,provider) {
   const ctrl=new AbortController();
   const timer=setTimeout(()=>ctrl.abort(),6500);
   try {
-    const r=await fetch(url,{headers:{'user-agent':'Mozilla/5.0 (compatible; ResumenPrensa/7.0)','accept':'application/rss+xml,application/xml,text/xml,*/*'},signal:ctrl.signal,redirect:'follow'});
+    const r=await fetch(url,{headers:{'user-agent':'Mozilla/5.0 (compatible; ResumenPrensa/7.1)','accept':'application/rss+xml,application/xml,text/xml,*/*'},signal:ctrl.signal,redirect:'follow'});
     if (!r.ok) return [];
     return parseFeed(await r.text(),hint,provider);
   } catch { return []; }
@@ -373,7 +373,7 @@ async function enrichItem(item) {
   try {
     const r=await fetch(item.url,{
       headers:{
-        'user-agent':'Mozilla/5.0 (compatible; ResumenPrensa/7.0)',
+        'user-agent':'Mozilla/5.0 (compatible; ResumenPrensa/7.1)',
         'accept':'text/html,application/xhtml+xml'
       },
       signal:ctrl.signal,
@@ -604,7 +604,7 @@ module.exports=async function handler(req,res) {
     res.setHeader('Pragma','no-cache');
     res.setHeader('Expires','0');
     return res.status(200).json({
-      news,count:news.length,start:start.toISOString(),end:end.toISOString(),version:'7.0',
+      news,count:news.length,start:start.toISOString(),end:end.toISOString(),version:'7.1',
       diagnostics:{feedsConsulted:jobs.length,raw:batches.flat().length,inPeriod:parsed.length,enriched:enriched.length,final:news.length}
     });
   } catch(e) {
