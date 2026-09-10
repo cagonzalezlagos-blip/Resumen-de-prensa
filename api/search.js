@@ -1,4 +1,4 @@
-// Resumen de Prensa - Vercel Serverless Function
+// Resumen de Prensa V3 - Vercel Serverless Function
 // Búsqueda AM/PM en fuentes abiertas, sin dependencias externas.
 
 const REGION_TERMS = [
@@ -16,7 +16,8 @@ const POLICE_TERMS = [
   'arma de fuego','armas de fuego','drogas','narcotráfico','narcotrafico','microtráfico','microtrafico',
   'detenido','detenidos','detención','detencion','incautación','incautacion','allanamiento','crimen organizado',
   'sicario','prisión preventiva','prision preventiva','lavado de activos','tráfico de drogas','trafico de drogas',
-  'orden de detención','orden de detencion','brigada investigadora','biro','bicrim','bh','mt0'
+  'orden de detención','orden de detencion','brigada investigadora','biro','bicrim','brigada de homicidios',
+  'brigada investigadora de robos','mt0','ministerio público','ministerio publico'
 ];
 
 const REGIONAL_RELEVANCE = [
@@ -24,7 +25,7 @@ const REGIONAL_RELEVANCE = [
   'manifestación','manifestacion','protesta','marcha','huelga','paro','movilización','movilizacion','contaminación','contaminacion',
   'derrame','corte de agua','corte de energía','corte de energia','delegado presidencial','seremi','gobernador',
   'alcalde','alcaldesa','corrupción','corrupcion','fraude','cohecho','malversación','malversacion','seguridad',
-  'municipalidad','concejo municipal','puerto','terminal','senapred'
+  'municipalidad','concejo municipal','puerto','terminal','senapred','enap','salud pública','salud publica'
 ];
 
 const AUTOPISTA_TERMS = [
@@ -33,26 +34,28 @@ const AUTOPISTA_TERMS = [
 ];
 
 const ROAD_OPERATION_TERMS = [
-  'cierre','cerrada','cerrado','corte','interrupción','interrupcion','accidente','colisión','colision','choque','volcamiento',
-  'congestión','congestion','alta congestión','alta congestion','restricción','restriccion','desvío','desvio','habilitada',
-  'habilitado','reapertura','tránsito suspendido','transito suspendido','pista bloqueada','pistas bloqueadas','emergencia vial'
+  'cierre','cerrada','cerrado','corte','interrupción','interrupcion','accidente','colisión','colision','choque',
+  'volcamiento','congestión','congestion','restricción','restriccion','desvío','desvio','habilitada','habilitado',
+  'reapertura','tránsito suspendido','transito suspendido','pista bloqueada','pistas bloqueadas','emergencia vial'
 ];
 
 const PASO_TERMS = [
   'paso los libertadores','paso fronterizo los libertadores','complejo los libertadores',
-  'sistema integrado cristo redentor','cristo redentor','alta montaña','alta montana'
+  'sistema integrado cristo redentor','cristo redentor'
 ];
 
 const PASO_OPERATION_TERMS = [
   'abierto','abierta','cerrado','cerrada','cierre','habilitado','habilitada','suspendido','suspendida',
-  'horario','restricción','restriccion','nieve','nevadas','viento','temporal','tránsito','transito','camiones','vehículos','vehiculos'
+  'horario','restricción','restriccion','nieve','nevadas','viento','temporal','tránsito','transito',
+  'camiones','vehículos','vehiculos','funcionamiento'
 ];
 
 const NATIONAL_RELEVANCE = [
-  'gobierno','presidente','presidencia','ministro','ministerio de seguridad','seguridad pública','seguridad publica','inteligencia',
-  'fuerzas armadas','congreso','senado','cámara de diputados','camara de diputados','proyecto de ley','terrorismo',
-  'atentado','frontera','crimen organizado','macrozona','homicidios','terremoto','tsunami','senapred','alerta roja',
-  'incendio forestal','emergencia nacional','orden público','orden publico','subsecretaría del interior','subsecretaria del interior'
+  'gobierno','presidente','presidencia','ministro','ministerio de seguridad','seguridad pública','seguridad publica',
+  'inteligencia','fuerzas armadas','congreso','senado','cámara de diputados','camara de diputados','proyecto de ley',
+  'terrorismo','atentado','frontera','crimen organizado','macrozona','homicidios','terremoto','tsunami','senapred',
+  'alerta roja','incendio forestal','emergencia nacional','orden público','orden publico','subsecretaría del interior',
+  'subsecretaria del interior'
 ];
 
 const CHILE_CONTEXT = [
@@ -60,32 +63,31 @@ const CHILE_CONTEXT = [
   'camara de diputados','carabineros de chile','pdi','policía de investigaciones','policia de investigaciones','senapred'
 ];
 
-const CHILE_SOURCES = [
-  'biobiochile','radio bío bío','radio bio bio','la tercera','emol','cooperativa','t13','24 horas','cnn chile',
-  'mega noticias','meganoticias','chv noticias','the clinic','ex-ante','radio agricultura','diario constitucional',
-  'pura noticia','puranoticia','g5 noticias','g5noticias','el observador','observador.cl','epicentro chile','epicentrochile',
-  'soy valparaíso','soy valparaiso','el mercurio de valparaíso','el mercurio de valparaiso','pdi chile','carabineros de chile'
-];
-
 const FOREIGN_CONTEXT = [
-  'mendoza','argentina','buenos aires','perú','peru','bolivia','uruguay','paraguay','méxico','mexico','españa','espana',
-  'estados unidos','ee. uu.','brasil','colombia','venezuela'
+  'mendoza','argentina','buenos aires','perú','peru','bolivia','uruguay','paraguay','méxico','mexico',
+  'españa','espana','estados unidos','ee. uu.','brasil','colombia','venezuela'
 ];
 
 const LOW_VALUE = [
   'cartelera','panorama','receta','horóscopo','horoscopo','festival gastronómico','festival gastronomico',
-  'concierto','estreno de película','estreno de pelicula','televisión','television','farándula','farandula',
-  'partido de fútbol','partido de futbol','campeonato','deportes','espectáculos','espectaculos'
+  'concierto','estreno','televisión','television','farándula','farandula','partido de fútbol','partido de futbol',
+  'campeonato','deportes','espectáculos','espectaculos'
 ];
 
-const TITLE_NOISE = [
-  'estado del tiempo y pasos internacionales','pronóstico del tiempo','pronostico del tiempo','efemérides','efemerides'
+const GENERIC_SUMMARY = [
+  'comprehensive up-to-date news coverage',
+  'aggregated from sources all over the world by google news',
+  'google news',
+  'latest news and headlines'
 ];
 
 function norm(s='') {
   return String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
 }
-function hasAny(s, arr) { const n=norm(s); return arr.some(x=>n.includes(norm(x))); }
+function hasAny(s, arr) {
+  const n = norm(s);
+  return arr.some(x => n.includes(norm(x)));
+}
 function decodeXml(s='') {
   return String(s)
     .replace(/<!\[CDATA\[|\]\]>/g,'')
@@ -104,21 +106,23 @@ function clean(s='') {
     .trim();
 }
 function tag(block,name) {
-  const m=block.match(new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${name}>`,'i'));
+  const m = block.match(new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${name}>`,'i'));
   return m ? decodeXml(m[1]).trim() : '';
 }
 function sourceFrom(link, explicit='') {
-  const e=clean(explicit);
+  const e = clean(explicit);
   if (e) return e;
   try { return new URL(link).hostname.replace(/^www\./,''); } catch { return ''; }
 }
 function stripSourceSuffix(title, source='') {
-  let t=clean(title);
-  const s=clean(source);
+  let t = clean(title);
+  const s = clean(source);
   if (s) {
-    const escaped=s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-    t=t.replace(new RegExp(`\\s*[-–—|]\\s*${escaped}\\s*$`,'i'),'').trim();
+    const escaped = s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    t = t.replace(new RegExp(`\\s*[-–—|]\\s*${escaped}\\s*$`,'i'),'').trim();
   }
+  // Muchos titulares de Google News terminan en " - Medio".
+  t = t.replace(/\s+[-–—|]\s+[^-–—|]{2,45}$/,'').trim();
   return t;
 }
 function similarity(a,b) {
@@ -126,57 +130,32 @@ function similarity(a,b) {
   const B=new Set(norm(b).replace(/[^a-z0-9ñ ]/g,' ').split(' ').filter(w=>w.length>2));
   if (!A.size || !B.size) return 0;
   let inter=0; for (const w of A) if (B.has(w)) inter++;
-  return inter / Math.max(A.size,B.size);
+  return inter/Math.max(A.size,B.size);
 }
 function usableSummary(title, raw, source='') {
   let s=clean(raw);
   const t=clean(title);
-  const src=clean(source);
-  if (!s) return '';
-
-  // Quita repeticiones frecuentes del titular y del nombre de la fuente.
-  if (similarity(t,s) > 0.82 || norm(s)===norm(t) || norm(s)===norm(`${t} ${src}`)) return '';
-  if (s.length < 45) return '';
-
-  // Elimina prefijos del tipo "Titular - Fuente" cuando vienen pegados al resumen.
+  if (!s || hasAny(s,GENERIC_SUMMARY) || s.length<55) return '';
+  if (similarity(t,s)>0.78 || norm(s)===norm(t)) return '';
   if (norm(s).startsWith(norm(t))) s=s.slice(t.length).replace(/^\s*[-–—:|]\s*/,'').trim();
-  if (src && norm(s).endsWith(norm(src))) s=s.slice(0,Math.max(0,s.length-src.length)).replace(/[\s\-–—|]+$/,'').trim();
-  if (similarity(t,s) > 0.82 || s.length < 45) return '';
-
-  // Mantiene una extensión adecuada para WhatsApp.
-  if (s.length > 520) {
-    s=s.slice(0,520);
+  if (!s || hasAny(s,GENERIC_SUMMARY) || similarity(t,s)>0.78 || s.length<55) return '';
+  if (s.length>560) {
+    s=s.slice(0,560);
     const cut=Math.max(s.lastIndexOf('. '),s.lastIndexOf('; '),s.lastIndexOf(', '));
-    if (cut>220) s=s.slice(0,cut+1);
-    else s=s.replace(/\s+\S*$/,'')+'…';
+    s=cut>240?s.slice(0,cut+1):s.replace(/\s+\S*$/,'')+'…';
   }
   return s;
 }
 function fallbackSummary(title, category, source='') {
-  const t=stripSourceSuffix(title,source);
-  const lower=norm(t);
-  if (category==='paso') return `La fuente reporta una actualización sobre la operación del Paso Fronterizo Los Libertadores. Revisa el enlace para confirmar la vigencia, horario y eventuales restricciones antes de difundir.`;
-  if (category==='autopistas') return `La fuente reporta una novedad operacional en una de las rutas de interés para la Región de Valparaíso. Revisa el enlace para confirmar ubicación, sentido de tránsito y vigencia antes de difundir.`;
-  if (category==='police') return `La fuente informa un procedimiento o hecho policial de interés en la Región de Valparaíso. Revisa el enlace de origen para confirmar las circunstancias y antecedentes disponibles antes de difundir.`;
-  if (category==='regional') return `La fuente reporta un hecho de interés regional relacionado con ${t.charAt(0).toLowerCase()+t.slice(1)}. Se recomienda verificar el antecedente completo en el enlace de origen.`;
-  return `La fuente informa un hecho de interés nacional relacionado con ${t.charAt(0).toLowerCase()+t.slice(1)}. Se recomienda revisar el antecedente completo en el enlace de origen antes de su difusión.`;
+  const t=stripSourceSuffix(title,source).replace(/[.]+$/,'').trim();
+  if (!t) return 'Se identificó una publicación potencialmente relevante. Se recomienda revisar la fuente antes de su difusión.';
+  if (category==='paso') return `Se informó una actualización relativa al Paso Fronterizo Los Libertadores: ${t}. Se recomienda verificar en la fuente la vigencia de la medida y las condiciones de operación antes de difundir.`;
+  if (category==='autopistas') return `Se informó una novedad operacional en una ruta de interés para la Región de Valparaíso: ${t}. Se recomienda confirmar en la fuente su ubicación, sentido de tránsito y vigencia.`;
+  if (category==='police') return `Se informó un hecho policial de interés en la Región de Valparaíso: ${t}. Se recomienda revisar la fuente para confirmar los antecedentes disponibles antes de difundir.`;
+  if (category==='regional') return `En la Región de Valparaíso se informó que ${t.charAt(0).toLowerCase()+t.slice(1)}. Se recomienda revisar la publicación original para complementar los antecedentes antes de su difusión.`;
+  return `A nivel nacional se informó que ${t.charAt(0).toLowerCase()+t.slice(1)}. Se recomienda revisar la fuente original para complementar los antecedentes antes de su difusión.`;
 }
-function score(text, category, hint) {
-  let s=0;
-  if (category==='police' && hasAny(text,POLICE_TERMS)) s+=7;
-  if (category==='regional' && hasAny(text,REGION_TERMS)) s+=5;
-  if (category==='regional' && hasAny(text,REGIONAL_RELEVANCE)) s+=2;
-  if (category==='national' && hasAny(text,NATIONAL_RELEVANCE)) s+=4;
-  if (category==='national' && hasAny(text,CHILE_CONTEXT)) s+=3;
-  if (category==='autopistas' && hasAny(text,AUTOPISTA_TERMS) && hasAny(text,ROAD_OPERATION_TERMS)) s+=9;
-  if (category==='paso' && hasAny(text,PASO_TERMS) && hasAny(text,PASO_OPERATION_TERMS)) s+=9;
-  if (hint===category) s+=1;
-  if (hasAny(text,['homicidio','secuestro','atentado','fallecido','muerto','heridos','alerta roja','evacuación','evacuacion'])) s+=1;
-  if (hasAny(text,LOW_VALUE)) s-=7;
-  if (hasAny(text,TITLE_NOISE) && !hasAny(text,REGION_TERMS) && !hasAny(text,PASO_TERMS)) s-=8;
-  return s;
-}
-function classify(text, hint='national') {
+function classify(text,hint='national') {
   if (hasAny(text,PASO_TERMS) && hasAny(text,PASO_OPERATION_TERMS)) return 'paso';
   if (hasAny(text,AUTOPISTA_TERMS) && hasAny(text,ROAD_OPERATION_TERMS)) return 'autopistas';
   const regional=hasAny(text,REGION_TERMS);
@@ -186,12 +165,12 @@ function classify(text, hint='national') {
   if (hint==='police' && police && hasAny(text,CHILE_CONTEXT)) return 'police';
   return 'national';
 }
-function isRelevantForCategory(text, category) {
+function relevant(text,category) {
+  if (hasAny(text,LOW_VALUE)) return false;
   if (category==='national') {
-    const chile=hasAny(text,CHILE_CONTEXT);
     const foreign=hasAny(text,FOREIGN_CONTEXT);
-    const chileSource=hasAny(text,CHILE_SOURCES);
-    if (!chile && !chileSource) return false;
+    const chile=hasAny(text,CHILE_CONTEXT);
+    if (!chile) return false;
     if (foreign && !hasAny(text,['paso los libertadores','cristo redentor','frontera chile argentina'])) return false;
     return hasAny(text,NATIONAL_RELEVANCE) || hasAny(text,POLICE_TERMS);
   }
@@ -200,6 +179,17 @@ function isRelevantForCategory(text, category) {
   if (category==='autopistas') return hasAny(text,AUTOPISTA_TERMS) && hasAny(text,ROAD_OPERATION_TERMS);
   if (category==='paso') return hasAny(text,PASO_TERMS) && hasAny(text,PASO_OPERATION_TERMS);
   return false;
+}
+function score(text,category,hint) {
+  let s=0;
+  if (category==='police') s+=8;
+  if (category==='regional') s+=6;
+  if (category==='national') s+=hasAny(text,NATIONAL_RELEVANCE)?6:3;
+  if (category==='autopistas') s+=9;
+  if (category==='paso') s+=9;
+  if (hint===category) s+=1;
+  if (hasAny(text,['homicidio','secuestro','atentado','fallecido','muerto','heridos','alerta roja','evacuación','evacuacion'])) s+=1;
+  return s;
 }
 function parseFeed(xml,hint,provider) {
   const blocks=xml.match(/<item[\s\S]*?<\/item>/gi) || xml.match(/<entry[\s\S]*?<\/entry>/gi) || [];
@@ -218,70 +208,19 @@ function parseFeed(xml,hint,provider) {
     const title=stripSourceSuffix(rawTitle,source).slice(0,220);
     const text=`${title} ${rawSummary} ${source}`;
     const category=classify(text,hint);
-    if (!isRelevantForCategory(text,category)) return null;
+    if (!relevant(text,category)) return null;
     const sc=score(text,category,hint);
-    if (sc<3) return null;
-    const goodSummary=usableSummary(title,rawSummary,source);
-    const summary=goodSummary || fallbackSummary(title,category,source);
+    const summary=usableSummary(title,rawSummary,source) || fallbackSummary(title,category,source);
     return {
-      title,
-      summary,
-      url:link,
-      source,
+      title, summary, url:link, source,
       published:published.toISOString(),
       category,
       relevance:sc>=8?'high':sc>=5?'medium':'low',
       included:sc>=5,
-      provider,
-      summaryQuality:goodSummary?'source':'fallback'
+      provider
     };
   }).filter(Boolean);
 }
-function metaContent(html, key, value) {
-  const patterns = [
-    new RegExp(`<meta[^>]+${key}=["']${value}["'][^>]+content=["']([^"']+)["'][^>]*>`, 'i'),
-    new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+${key}=["']${value}["'][^>]*>`, 'i')
-  ];
-  for (const re of patterns) {
-    const m=html.match(re);
-    if (m) return clean(m[1]);
-  }
-  return '';
-}
-function canonicalLink(html) {
-  const m=html.match(/<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)["']/i) ||
-          html.match(/<link[^>]+href=["']([^"']+)["'][^>]+rel=["']canonical["']/i);
-  return m ? decodeXml(m[1]) : '';
-}
-async function enrichItem(item) {
-  if (!item.url) return item;
-  const needsSummary=item.summaryQuality!=='source';
-  const needsUrl=/news\.google\.com|bing\.com/i.test(item.url);
-  if (!needsSummary && !needsUrl) return item;
-  const ctrl=new AbortController();
-  const timer=setTimeout(()=>ctrl.abort(),4500);
-  try {
-    const r=await fetch(item.url,{headers:{'user-agent':'Mozilla/5.0 (compatible; ResumenPrensa/2.0)','accept':'text/html,application/xhtml+xml'},signal:ctrl.signal,redirect:'follow'});
-    if (!r.ok) return item;
-    const html=await r.text();
-    const desc=metaContent(html,'property','og:description') || metaContent(html,'name','description') || metaContent(html,'name','twitter:description');
-    const resolved=canonicalLink(html) || r.url || item.url;
-    const better=usableSummary(item.title,desc,item.source);
-    return {
-      ...item,
-      url: resolved && !/news\.google\.com\/rss\//i.test(resolved) ? resolved : item.url,
-      summary: better || item.summary,
-      summaryQuality: better ? 'source' : item.summaryQuality
-    };
-  } catch { return item; }
-  finally { clearTimeout(timer); }
-}
-async function enrichItems(items, limit=24) {
-  const selected=items.slice(0,limit);
-  const enriched=await Promise.all(selected.map(enrichItem));
-  return [...enriched, ...items.slice(limit)];
-}
-
 function google(q) {
   return `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=es-419&gl=CL&ceid=CL:es-419`;
 }
@@ -290,9 +229,12 @@ function bing(q) {
 }
 async function fetchFeed(url,hint,provider) {
   const ctrl=new AbortController();
-  const timer=setTimeout(()=>ctrl.abort(),7000);
+  const timer=setTimeout(()=>ctrl.abort(),6500);
   try {
-    const r=await fetch(url,{headers:{'user-agent':'Mozilla/5.0 (compatible; ResumenPrensa/2.0)','accept':'application/rss+xml,application/xml,text/xml,*/*'},signal:ctrl.signal,redirect:'follow'});
+    const r=await fetch(url,{
+      headers:{'user-agent':'Mozilla/5.0 (compatible; ResumenPrensa/3.0)','accept':'application/rss+xml,application/xml,text/xml,*/*'},
+      signal:ctrl.signal,redirect:'follow'
+    });
     if (!r.ok) return [];
     return parseFeed(await r.text(),hint,provider);
   } catch { return []; }
@@ -307,68 +249,62 @@ function dateClause(start,end) {
 function queries(start,end) {
   const dc=dateClause(start,end);
   return [
-    // Nacional: seguridad, autoridades, orden público, emergencias e inteligencia.
-    ['national',`Chile seguridad pública PDI Carabineros Fiscalía crimen organizado homicidios Gobierno Congreso inteligencia${dc}`],
-    ['national',`Chile terrorismo atentado frontera orden público Fuerzas Armadas SENAPRED alerta roja emergencia${dc}`],
-    ['national',`Chile Ministerio de Seguridad Subsecretaría del Interior seguridad autoridades policial${dc}`],
+    ['national',`Chile seguridad Gobierno Congreso PDI Carabineros crimen organizado inteligencia emergencia${dc}`],
+    ['national',`Chile atentado terrorismo orden público Fuerzas Armadas SENAPRED frontera seguridad${dc}`],
 
-    // Regional: consultas más acotadas para aumentar cobertura real.
-    ['regional',`Valparaíso "Viña del Mar" Quilpué "Villa Alemana" Concón emergencia protesta autoridad seguridad${dc}`],
-    ['regional',`Quintero Puchuncaví Quillota Limache "La Calera" seguridad emergencia municipalidad protesta${dc}`],
-    ['regional',`"San Antonio" Cartagena "El Tabo" "El Quisco" Algarrobo "Santo Domingo" seguridad emergencia${dc}`],
-    ['regional',`"Los Andes" "San Felipe" "La Ligua" Petorca Cabildo seguridad emergencia autoridad${dc}`],
-    ['regional',`"Rapa Nui" "Isla de Pascua" "Hanga Roa" seguridad emergencia aeropuerto tsunami temporal${dc}`],
-    ['regional',`"Juan Fernández" "Robinson Crusoe" emergencia seguridad temporal${dc}`],
+    ['regional',`Valparaíso contingencia emergencia municipalidad protesta seguridad${dc}`],
+    ['regional',`"Viña del Mar" contingencia emergencia municipalidad protesta seguridad${dc}`],
+    ['regional',`Quilpué OR "Villa Alemana" OR Concón contingencia emergencia seguridad municipalidad${dc}`],
+    ['regional',`Quillota OR Limache OR "La Calera" OR Quintero OR Puchuncaví contingencia emergencia seguridad${dc}`],
+    ['regional',`"San Antonio" OR "Los Andes" OR "San Felipe" OR "La Ligua" contingencia emergencia seguridad${dc}`],
+    ['regional',`"Rapa Nui" OR "Isla de Pascua" OR "Hanga Roa" emergencia seguridad contingencia${dc}`],
 
-    // Policial regional con énfasis PDI.
-    ['police',`Valparaíso PDI "Policía de Investigaciones" detenido homicidio robo drogas arma${dc}`],
-    ['police',`"Viña del Mar" PDI Carabineros Fiscalía homicidio robo drogas detenido${dc}`],
-    ['police',`Quilpué "Villa Alemana" Concón PDI Carabineros Fiscalía homicidio robo drogas${dc}`],
-    ['police',`Quillota "San Antonio" "Los Andes" "San Felipe" PDI Carabineros Fiscalía${dc}`],
+    ['police',`Valparaíso PDI OR Carabineros OR Fiscalía homicidio robo drogas detenido secuestro${dc}`],
+    ['police',`"Viña del Mar" PDI OR Carabineros OR Fiscalía robo detenido homicidio drogas${dc}`],
+    ['police',`Quilpué OR "Villa Alemana" OR Concón PDI Carabineros Fiscalía robo detenido drogas${dc}`],
+    ['police',`site:pdi.cl Valparaíso${dc}`],
+    ['police',`site:biobiochile.cl Valparaíso PDI Carabineros Fiscalía${dc}`],
+    ['police',`site:cooperativa.cl Valparaíso PDI Carabineros Fiscalía${dc}`],
+    ['regional',`site:puranoticia.pnt.cl Valparaíso${dc}`],
+    ['regional',`site:g5noticias.cl Valparaíso${dc}`],
+    ['regional',`site:observador.cl Valparaíso${dc}`],
 
-    // Fuentes regionales conocidas.
-    ['regional',`site:observador.cl Valparaíso seguridad policial emergencia${dc}`],
-    ['regional',`site:puranoticia.pnt.cl Valparaíso seguridad policial emergencia${dc}`],
-    ['regional',`site:g5noticias.cl Valparaíso seguridad policial emergencia${dc}`],
-    ['regional',`site:epicentrochile.com Valparaíso seguridad policial emergencia${dc}`],
-    ['regional',`site:biobiochile.cl Valparaíso seguridad policial emergencia${dc}`],
-    ['regional',`site:soyvalparaiso.cl seguridad policial emergencia${dc}`],
+    ['autopistas',`"Ruta 68" cierre accidente congestión desvío${dc}`],
+    ['autopistas',`"Ruta 60 CH" OR "Autopista Los Andes" cierre accidente congestión${dc}`],
+    ['autopistas',`"Ruta 5 Norte" OR "Autopista del Aconcagua" cierre accidente congestión${dc}`],
+    ['autopistas',`"Ruta 62" OR "Camino Troncal" OR "Ruta 66" cierre accidente congestión${dc}`],
 
-    // Autopistas: solo novedades operativas.
-    ['autopistas',`"Ruta 68" accidente cierre congestión desvío reapertura${dc}`],
-    ['autopistas',`"Ruta 60 CH" OR "Autopista Los Andes" accidente cierre congestión restricción${dc}`],
-    ['autopistas',`"Ruta 5 Norte" OR "Autopista del Aconcagua" accidente cierre congestión${dc}`],
-    ['autopistas',`"Ruta 62" OR "Camino Troncal" accidente cierre congestión${dc}`],
-    ['autopistas',`"Ruta 66" OR "Carretera de la Fruta" accidente cierre congestión${dc}`],
-
-    // Paso fronterizo.
-    ['paso',`"Paso Los Libertadores" abierto cerrado cierre nieve viento tránsito${dc}`],
-    ['paso',`"Complejo Los Libertadores" horario habilitado suspendido camiones${dc}`],
-    ['paso',`"Sistema Integrado Cristo Redentor" Chile abierto cerrado nieve${dc}`]
+    ['paso',`"Paso Los Libertadores" abierto cerrado cierre habilitado nieve viento tránsito${dc}`],
+    ['paso',`"Complejo Los Libertadores" OR "Cristo Redentor" abierto cerrado habilitado tránsito${dc}`]
   ];
 }
-function titleKey(title='') {
-  const stop=new Set(['para','desde','sobre','entre','ante','tras','este','esta','estos','estas','chile','region','valparaiso','noticia','hoy','ayer','dice','segun']);
-  return norm(title).replace(/[^a-z0-9ñ ]/g,' ').split(' ').filter(w=>w.length>3&&!stop.has(w)).slice(0,14).join('|');
+function keyWords(title='') {
+  const stop=new Set(['para','desde','sobre','entre','ante','tras','este','esta','estos','estas','chile','region',
+    'valparaiso','noticia','hoy','dice','segun','informo','informan','nuevo','nueva']);
+  return norm(title).replace(/[^a-z0-9ñ ]/g,' ').split(' ')
+    .filter(w=>w.length>3&&!stop.has(w)).slice(0,12);
 }
 function sameEvent(a,b) {
-  if (a.category!==b.category) return false;
-  const sa=titleKey(a.title), sb=titleKey(b.title);
-  if (!sa || !sb) return false;
-  return similarity(sa.replace(/\|/g,' '),sb.replace(/\|/g,' ')) >= 0.58;
+  const A=new Set(keyWords(a.title)), B=new Set(keyWords(b.title));
+  if (!A.size || !B.size) return false;
+  let inter=0; for (const w of A) if (B.has(w)) inter++;
+  return inter/Math.min(A.size,B.size)>=0.58;
 }
 function dedupe(items) {
   const out=[];
-  const rank=x=>(x.relevance==='high'?3:x.relevance==='medium'?2:1)+(x.summaryQuality==='source'?0.5:0)+(x.source?0.1:0);
   for (const x of items) {
-    const idx=out.findIndex(y=>sameEvent(x,y));
-    if (idx===-1) out.push(x);
-    else if (rank(x)>rank(out[idx])) out[idx]=x;
+    const idx=out.findIndex(y=>y.category===x.category && sameEvent(x,y));
+    if (idx<0) out.push(x);
+    else {
+      const old=out[idx];
+      const rank=z=>(z.relevance==='high'?3:z.relevance==='medium'?2:1)+(z.summary&&!hasAny(z.summary,GENERIC_SUMMARY)?0.5:0);
+      if (rank(x)>rank(old)) out[idx]=x;
+    }
   }
   return out;
 }
 
-module.exports = async function handler(req,res) {
+module.exports=async function handler(req,res) {
   if (req.method!=='GET') return res.status(405).json({error:'Método no permitido'});
   try {
     const start=new Date(req.query.start);
@@ -376,54 +312,36 @@ module.exports = async function handler(req,res) {
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start>=end) {
       return res.status(400).json({error:'Rango de fechas inválido'});
     }
-
     const defs=queries(start,end);
     const jobs=[];
     for (const [hint,q] of defs) {
       jobs.push(fetchFeed(google(q),hint,'Google News'));
-      // Bing complementa consultas claves para mejorar cobertura sin exceder el tiempo de ejecución.
-      if (['national','police','regional'].includes(hint) && jobs.length<30) jobs.push(fetchFeed(bing(q),hint,'Bing News'));
+      if (['national','regional','police'].includes(hint)) jobs.push(fetchFeed(bing(q),hint,'Bing News'));
     }
-
     const batches=await Promise.all(jobs);
     const parsed=batches.flat();
     let news=parsed.filter(x=>{
       const d=new Date(x.published);
       return d>=start && d<=end;
     });
-
-    // Primero ordena por relevancia para enriquecer solo los resultados más útiles.
-    news=news.sort((a,b)=>{
-      const r=x=>x.relevance==='high'?3:x.relevance==='medium'?2:1;
-      return (r(b)-r(a)) || (new Date(b.published)-new Date(a.published));
-    });
-    news=await enrichItems(news,24);
-
-    // Los textos sin descripción real quedan visibles para revisión, pero no se seleccionan automáticamente.
-    news=news.map(x=>x.summaryQuality==='source' ? x : {...x,included:false,relevance:x.relevance==='high'?'medium':x.relevance});
-
     news=dedupe(news).sort((a,b)=>{
       const r=x=>x.relevance==='high'?3:x.relevance==='medium'?2:1;
       return (r(b)-r(a)) || (new Date(b.published)-new Date(a.published));
     }).slice(0,120);
 
-    res.setHeader('Cache-Control','s-maxage=120, stale-while-revalidate=240');
+    res.setHeader('Cache-Control','no-store');
     return res.status(200).json({
       news,
       count:news.length,
       start:start.toISOString(),
       end:end.toISOString(),
-      diagnostics:{
-        feedsConsulted:jobs.length,
-        parsed:parsed.length,
-        inPeriod:news.length,
-        categories:news.reduce((acc,x)=>{acc[x.category]=(acc[x.category]||0)+1; return acc;},{})
-      }
+      version:'3.0',
+      diagnostics:{feedsConsulted:jobs.length,parsed:parsed.length,inPeriod:news.length}
     });
-  } catch (e) {
+  } catch(e) {
     return res.status(500).json({
       error:'No fue posible consultar noticias',
-      detail:String(e && e.message ? e.message : e)
+      detail:String(e&&e.message?e.message:e)
     });
   }
 };
