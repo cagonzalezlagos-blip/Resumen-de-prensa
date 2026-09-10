@@ -1,4 +1,4 @@
-// Resumen de Prensa V8.3 - Vercel Serverless Function
+// Resumen de Prensa V8.4 - Vercel Serverless Function
 // Búsqueda AM/PM en fuentes abiertas, con filtros, enriquecimiento y deduplicación.
 
 const REGION_TERMS = [
@@ -208,8 +208,16 @@ function classify(text,hint='national',source='') {
   if (regional) return 'regional';
   return 'national';
 }
+
+function ordinaryLocalCaseOutsideValparaiso(text=''){
+  const n=norm(text);
+  const outside=hasAny(n,['providencia','las condes','maipú','maipu','puente alto','la florida','san bernardo','osorno','temuco','concepción','concepcion']);
+  const ordinary=hasAny(n,['atropello','accidente de tránsito','accidente de transito','robo simple','lesiones']);
+  const nationalImpact=hasAny(n,['crimen organizado','terrorismo','atentado','secuestro','homicidio múltiple','homicidio multiple','corrupción','corrupcion','inteligencia']);
+  return outside && ordinary && !nationalImpact;
+}
 function relevant(text,category,source='') {
-  if (hasAny(text,LOW_VALUE) || lowImpactSeismic(text)) return false;
+  if (hasAny(text,LOW_VALUE) || lowImpactSeismic(text) || (category==='national' && ordinaryLocalCaseOutsideValparaiso(text))) return false;
   if (category==='national') {
     const foreign=hasAny(text,FOREIGN_CONTEXT);
     const chile=hasAny(text,CHILE_CONTEXT);
@@ -272,7 +280,7 @@ async function fetchFeed(url,hint,provider) {
   const ctrl=new AbortController();
   const timer=setTimeout(()=>ctrl.abort(),6500);
   try {
-    const r=await fetch(url,{headers:{'user-agent':'Mozilla/5.0 (compatible; ResumenPrensa/8.3)','accept':'application/rss+xml,application/xml,text/xml,*/*'},signal:ctrl.signal,redirect:'follow'});
+    const r=await fetch(url,{headers:{'user-agent':'Mozilla/5.0 (compatible; ResumenPrensa/8.4)','accept':'application/rss+xml,application/xml,text/xml,*/*'},signal:ctrl.signal,redirect:'follow'});
     if (!r.ok) return [];
     return parseFeed(await r.text(),hint,provider);
   } catch { return []; }
@@ -333,6 +341,9 @@ function editorialClean(text='') {
     .replace(/\bTambién puedes leer\b[^.]{0,500}(?:\.|$)/gi,' ')
     .replace(/\bTe puede interesar\b[^.]{0,500}(?:\.|$)/gi,' ')
     .replace(/\bRelacionado(?:s)?\b\s*:?\s*[^.]{0,500}(?:\.|$)/gi,' ')
+    .replace(/\bLa otra causa que ya lo tenía bajo la lupa\b/gi,' ')
+    .replace(/\bMesas de trabajo para abordar este problema\b/gi,' ')
+    .replace(/\bLlaman a [“\"']?sacarse los prejuicios[”\"']? y buscar un acuerdo por secreto bancario\b/gi,' ')
     .replace(/\bSíguenos en\b[^.]{0,300}(?:\.|$)/gi,' ')
     .replace(/\bSuscríbete\b[^.]{0,300}(?:\.|$)/gi,' ')
     .replace(/\bNewsletter\b[^.]{0,300}(?:\.|$)/gi,' ')
@@ -413,17 +424,14 @@ function completeTitleFromUrl(title='',url=''){
     const words=slug.replace(/\.shtml?$/i,'').replace(/[-_]+/g,' ').trim();
     if(words.length<=t.length+10) return t;
 
-    // Solo completa cuando el título parece claramente cortado.
     const truncated=/[:;,–—-]\s*(?:de|del|la|el|un|una|y|o)?\s*$/i.test(t) || t.length<42;
     if(!truncated) return t;
 
-    let restored=words.charAt(0).toUpperCase()+words.slice(1);
-    restored=restored
-      .replace(/\bpdi\b/gi,'PDI')
-      .replace(/\bconaf\b/gi,'CONAF')
-      .replace(/\bsenapred\b/gi,'Senapred')
-      .replace(/\bsenda\b/gi,'SENDA');
-    return restored;
+    return titleCaseFromSlug(words)
+      .replace(/\bPdi\b/g,'PDI')
+      .replace(/\bConaf\b/g,'CONAF')
+      .replace(/\bSenda\b/g,'SENDA')
+      .replace(/\bSamu\b/g,'SAMU');
   }catch{
     return t;
   }
@@ -434,8 +442,11 @@ function formalizeSummary(text='') {
     .replace(/\s+([”"'])/g,'$1')
     .replace(/([“"'])\s+/g,'$1')
     .replace(/\s*-\s*-\s*/g,' - ')
+    .replace(/\s+\./g,'.')
     .trim();
 
+  s=removeRepeatedSentences(s);
+  s=balanceQuotes(s);
   if(s && !/[.!?]$/.test(s)) s+='.';
   return s;
 }
@@ -534,7 +545,7 @@ function extractiveSummary(articleText='',title='',category='national') {
     out=acc;
   }
 
-  out=formalizeSummary(out);
+  out=out.split(/\n\n+/).map(p=>formalizeSummary(p)).filter(Boolean).join('\n\n');
 
   if(out.length<170 || similarity(out,title)>0.72 || summaryLooksEditoriallyBad(out)) return '';
   return out;
@@ -588,7 +599,7 @@ async function resolveDirectByTitle(item) {
   const timer=setTimeout(()=>ctrl.abort(),5000);
   try{
     const r=await fetch(url,{
-      headers:{'user-agent':'Mozilla/5.0 (compatible; ResumenPrensa/8.3)'},
+      headers:{'user-agent':'Mozilla/5.0 (compatible; ResumenPrensa/8.4)'},
       signal:ctrl.signal,redirect:'follow'
     });
     if(!r.ok) return '';
@@ -625,7 +636,7 @@ async function enrichItem(item) {
   try {
     const r=await fetch(workingUrl,{
       headers:{
-        'user-agent':'Mozilla/5.0 (compatible; ResumenPrensa/8.3)',
+        'user-agent':'Mozilla/5.0 (compatible; ResumenPrensa/8.4)',
         'accept':'text/html,application/xhtml+xml'
       },
       signal:ctrl.signal,
@@ -897,7 +908,7 @@ module.exports=async function handler(req,res) {
     res.setHeader('Pragma','no-cache');
     res.setHeader('Expires','0');
     return res.status(200).json({
-      news,count:news.length,start:start.toISOString(),end:end.toISOString(),version:'8.3',
+      news,count:news.length,start:start.toISOString(),end:end.toISOString(),version:'8.4',
       diagnostics:{feedsConsulted:jobs.length,raw:batches.flat().length,inPeriod:parsed.length,enriched:enriched.length,final:news.length}
     });
   } catch(e) {

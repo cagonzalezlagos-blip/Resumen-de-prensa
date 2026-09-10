@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <meta name="description" content="Generador AM/PM de Resumen de Prensa para revisión de contingencia nacional y Región de Valparaíso.">
-  <title>Resumen de Prensa · V8.3</title>
+  <title>Resumen de Prensa · V8.4</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
@@ -65,7 +65,7 @@
 
   <section class="card hidden" id="resultCard">
     <h2 class="section-title">Informe generado</h2>
-    <p class="small">Revisa el texto antes de enviarlo. La aplicación intenta leer el contenido real de cada noticia y resumir qué ocurrió, quiénes participaron, dónde, cuándo y las principales causas o consecuencias. Preselecciona noticias con enlace directo y resumen obtenido desde la fuente original. Los textos se depuran para mantener una redacción formal, clara y comprensible, en uno o dos párrafos breves, sin elementos ajenos al contenido periodístico.</p>
+    <p class="small">Revisa el texto antes de enviarlo. La aplicación intenta leer el contenido real de cada noticia y resumir qué ocurrió, quiénes participaron, dónde, cuándo y las principales causas o consecuencias. Preselecciona noticias con enlace directo y resumen obtenido desde la fuente original. Los textos se depuran para mantener una redacción formal, clara y comprensible, en uno o dos párrafos breves, evitando repeticiones, subtítulos internos, citas incompletas y elementos ajenos al contenido periodístico.</p>
     <div class="actions">
       <button id="copy" type="button">Copiar</button>
       <button id="share" type="button">Compartir</button>
@@ -231,7 +231,7 @@ async function searchNews() {
       type,
       date:ensureDate()
     });
-    q.set('_v','83');
+    q.set('_v','84');
     const r = await fetch('/api/search?'+q.toString(), {cache:'no-store'});
     const data = await r.json().catch(()=>({}));
     console.log('Resumen de Prensa API', data.version || 'sin versión');
