@@ -1,4 +1,4 @@
-// Resumen de Prensa V4 - Vercel Serverless Function
+// Resumen de Prensa V5 - Vercel Serverless Function
 // Búsqueda AM/PM en fuentes abiertas, con filtros, enriquecimiento y deduplicación.
 
 const REGION_TERMS = [
@@ -215,7 +215,7 @@ async function fetchFeed(url,hint,provider) {
   const ctrl=new AbortController();
   const timer=setTimeout(()=>ctrl.abort(),6500);
   try {
-    const r=await fetch(url,{headers:{'user-agent':'Mozilla/5.0 (compatible; ResumenPrensa/4.0)','accept':'application/rss+xml,application/xml,text/xml,*/*'},signal:ctrl.signal,redirect:'follow'});
+    const r=await fetch(url,{headers:{'user-agent':'Mozilla/5.0 (compatible; ResumenPrensa/5.0)','accept':'application/rss+xml,application/xml,text/xml,*/*'},signal:ctrl.signal,redirect:'follow'});
     if (!r.ok) return [];
     return parseFeed(await r.text(),hint,provider);
   } catch { return []; }
@@ -241,7 +241,7 @@ async function enrichItem(item) {
   const ctrl=new AbortController();
   const timer=setTimeout(()=>ctrl.abort(),4800);
   try {
-    const r=await fetch(item.url,{headers:{'user-agent':'Mozilla/5.0 (compatible; ResumenPrensa/4.0)','accept':'text/html,application/xhtml+xml'},signal:ctrl.signal,redirect:'follow'});
+    const r=await fetch(item.url,{headers:{'user-agent':'Mozilla/5.0 (compatible; ResumenPrensa/5.0)','accept':'text/html,application/xhtml+xml'},signal:ctrl.signal,redirect:'follow'});
     if (!r.ok) return item;
     const html=await r.text();
     const finalUrl=r.url||item.url;
@@ -326,6 +326,23 @@ function dedupe(items) {
   }
   return out;
 }
+
+function titleSummary(title,category) {
+  const t=clean(title).replace(/[.]+$/,'').trim();
+  if (!t) return '';
+  let s=t;
+  // Convierte titulares frecuentes a una oración más natural sin inventar antecedentes.
+  s=s.replace(/^PDI\s+/i,'La PDI ');
+  s=s.replace(/^Carabineros\s+/i,'Carabineros ');
+  s=s.replace(/^Fiscalía\s+/i,'La Fiscalía ');
+  s=s.replace(/^Gobierno\s+/i,'El Gobierno ');
+  s=s.replace(/^CONAF\s+/i,'CONAF ');
+  s=s.replace(/^Senapred\s+/i,'Senapred ');
+  s=s.charAt(0).toUpperCase()+s.slice(1);
+  if (!/[.!?]$/.test(s)) s+='.';
+  return s;
+}
+
 function suspiciousTitle(t='') {
   const s=clean(t);
   if (!s || s.length<20) return true;
@@ -361,16 +378,17 @@ module.exports=async function handler(req,res) {
       const sc=score(text,category,x.hint,!!x.summary,direct);
       const title=stripSourceSuffix(x.title,x.source).trim();
       const badTitle=suspiciousTitle(title);
-      const included=sc>=7 && !!x.summary && !badTitle;
+      const summary=x.summary||titleSummary(title,category);
       return {
         title,
-        summary:x.summary||'',
+        summary,
         url:x.url,
         source:x.source,
         published:x.published,
         category,
         relevance:sc>=10?'high':sc>=7?'medium':'low',
-        included,
+        included:false,
+        scoreValue:sc,
         summaryVerified:!!x.summary,
         titleVerified:!badTitle,
         provider:x.provider
@@ -379,14 +397,28 @@ module.exports=async function handler(req,res) {
 
     news=news.sort((a,b)=>{
       const r=x=>x.relevance==='high'?3:x.relevance==='medium'?2:1;
-      return (r(b)-r(a))||(new Date(b.published)-new Date(a.published));
+      return (r(b)-r(a))||(b.scoreValue-a.scoreValue)||(new Date(b.published)-new Date(a.published));
     }).slice(0,120);
+
+    // Preselección equilibrada: prioriza relevancia, evita saturar el informe
+    // y deja el resto disponible para revisión manual.
+    const quotas={national:6,regional:6,police:8,autopistas:3,paso:3};
+    const used={national:0,regional:0,police:0,autopistas:0,paso:0};
+    news=news.map(x=>{
+      const eligible=x.titleVerified && x.relevance!=='low' && x.scoreValue>=7;
+      if (eligible && used[x.category] < (quotas[x.category]||0)) {
+        x.included=true;
+        used[x.category]++;
+      }
+      delete x.scoreValue;
+      return x;
+    });
 
     res.setHeader('Cache-Control','no-store, no-cache, must-revalidate, proxy-revalidate');
     res.setHeader('Pragma','no-cache');
     res.setHeader('Expires','0');
     return res.status(200).json({
-      news,count:news.length,start:start.toISOString(),end:end.toISOString(),version:'4.0',
+      news,count:news.length,start:start.toISOString(),end:end.toISOString(),version:'5.0',
       diagnostics:{feedsConsulted:jobs.length,raw:batches.flat().length,inPeriod:parsed.length,enriched:enriched.length,final:news.length}
     });
   } catch(e) {
